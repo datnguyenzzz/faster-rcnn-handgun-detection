@@ -10,15 +10,17 @@ IMAGES = os.path.join(ROOT_DIR,"images")
 COCO_WEIGHTS = os.path.join(ROOT_DIR,"pretrained\\resnet101_weights_th.h5")
 
 class TrainConfig():
-    NAME = "gun"
-    IMAGES_PER_GPU = 1
-    NUM_CLASSES = 2
-    BATCH_SIZE = 100
-    DETECTION_MIN_CONFIDENCE = 0.9
+    def __init__(self):
+        self.IMAGES_PER_GPU = 1
+        self.NUM_CLASSES = 2
+        self.BATCH_SIZE = 100
+        self.DETECTION_MIN_CONFIDENCE = 0.9
+        self.IMAGE_SHAPE = [800,800,3]
 
 class InferenceConfig():
-    GPU_NUM = 1
-    IMAGES_PER_GPU = 1
+    def __init__(self):
+        self.GPU_NUM = 1
+        self.IMAGES_PER_GPU = 1
 
 class GunDataset():
     def __init__(self):
@@ -26,7 +28,6 @@ class GunDataset():
 
     def add_image(self,dict):
         self.image_attribuites.append(dict)
-        print(dict)
 
     def load_attributes(self, subset):
         #subset = train or val
