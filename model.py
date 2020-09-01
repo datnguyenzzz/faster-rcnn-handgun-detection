@@ -1,7 +1,7 @@
 import tensorflow as tf
-from src import resnet101
+import resnet101
 
-class MaskRCNN():
+class RCNN():
     def __init__(self,mode,config):
         self.mode = mode
         self.config = config #config hyperparameter

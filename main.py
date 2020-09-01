@@ -1,18 +1,24 @@
 import os
 import json
 import skimage.draw
+import argparse
+import model
 
-ROOT_DIR = os.path.abspath("../../database")
+ROOT_DIR = os.path.abspath("../database")
 ANNOTATIONS = os.path.join(ROOT_DIR, "annotations")
 IMAGES = os.path.join(ROOT_DIR,"images")
 COCO_WEIGHTS = os.path.join(ROOT_DIR,"pretrained\\resnet101_weights_th.h5")
 
-class GunConfig():
+class TrainConfig():
     NAME = "gun"
-    IMAGES_PER_GPU = 2
+    IMAGES_PER_GPU = 1
     NUM_CLASSES = 2
     BATCH_SIZE = 100
     DETECTION_MIN_CONFIDENCE = 0.9
+
+class InferenceConfig():
+    GPU_NUM = 1
+    IMAGES_PER_GPU = 1
 
 class GunDataset():
     def __init__(self):
@@ -65,7 +71,16 @@ class GunDataset():
 ################################################################################
 #main
 ################################################################################
-config = GunConfig()
-data = GunDataset()
 
-data.load_attributes("train");
+parser = argparse.ArgumentParser()
+parser.add_argument("command")
+parser.add_argument("--image", required = False)
+parser.add_argument("--video", required = False)
+args = parser.parse_args()
+
+if args.command == "train":
+    config = TrainConfig()
+    model = model.RCNN(mode = "train", config = config)
+else:
+    config = InferenceConfig()
+    model = model.RCNN(mode = "inference", config = config)

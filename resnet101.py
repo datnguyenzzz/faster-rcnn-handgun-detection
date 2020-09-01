@@ -8,7 +8,7 @@ filters - the dimensionality of the output space (i.e. the number of output filt
 
 class BatchNorm(layers.BatchNormalization):
     """
-    Note about training values:
+    Note about training values: 
         None: Train BN layers. This is the normal mode
         False: Freeze BN layers. Good when batch size is small
         True: (don't use). Set layer in training mode even when making inferences
