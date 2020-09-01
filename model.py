@@ -29,4 +29,14 @@ class RCNN():
             input_gt_boxes = keras.Input(shape = [None,4], dtype=tf.float32)
 
             #normalize
-            gt_boxes = layers.Lambda(lambda x : utils.norm_boxes(x,K.shape(input_image)))(input_gt_boxes)
+            gt_boxes = layers.Lambda(lambda x : utils.norm_boxes(x,K.shape(input_image)[1:3]))(input_gt_boxes)
+        elif mode == "inference":
+            input_anchors = keras.Input(shape = [None,4], dtype=tf.float32)
+
+        #resnet layer
+        C1,C2,C3,C4,C5 = resnet101.build_layers(input = input_image, config.TRAIN_BN)
+        #FPN
+        P2,P3,P4,P5,P6 = resnet101.build_FPN(C1=C1,C2=C2,C3=C3,C4=C4,C5=C5,config=config)
+
+        RPN_feature = [P2,P3,P4,P5,P6]
+        RCNN_feature = [P2,P3,P4,P5]

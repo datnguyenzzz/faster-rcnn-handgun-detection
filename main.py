@@ -17,10 +17,15 @@ class TrainConfig():
         self.DETECTION_MIN_CONFIDENCE = 0.9
         self.IMAGE_SHAPE = [800,800,3]
 
+        self.TRAIN_BN = False
+        self.PIRAMID_SIZE = 256
+
 class InferenceConfig():
     def __init__(self):
         self.GPU_NUM = 1
         self.IMAGES_PER_GPU = 1
+
+        self.TRAIN_BN = False
 
 class GunDataset():
     def __init__(self):

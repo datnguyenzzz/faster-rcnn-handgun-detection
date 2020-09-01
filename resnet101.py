@@ -8,7 +8,7 @@ filters - the dimensionality of the output space (i.e. the number of output filt
 
 class BatchNorm(layers.BatchNormalization):
     """
-    Note about training values: 
+    Note about training values:
         None: Train BN layers. This is the normal mode
         False: Freeze BN layers. Good when batch size is small
         True: (don't use). Set layer in training mode even when making inferences
@@ -60,7 +60,7 @@ def halved_block(input, filters, strides=(2,2), use_bias=True, train_bn = True):
 
     return x
 
-def build_graph(input, train_bn=True):
+def build_layers(input, train_bn=True):
 
     x = layers.ZeroPadding2D((3,3))(input)
     x = layers.Conv2D(64, kernel_size=(7,7), strides=(2,2), use_bias=True)(x)
@@ -87,3 +87,30 @@ def build_graph(input, train_bn=True):
     Stage5 = x = normal_block(x, filters=[512,512,2048], train_bn=train_bn)
 
     return [Stage1,Stage2,Stage3,Stage4,Stage5]
+
+def build_FPN(C1,C2,C3,C4,C5,config):
+    P5 = layers.Conv2D(config.PIRAMID_SIZE, kernel_size=(1,1))(C5)
+
+    P4 = layers.Add()([
+        layers.UpSampling2D(size=(2,2))(P5),
+        layers.Conv2D(config.PIRAMID_SIZE, kernel_size=(1,1))(C4)
+    ])
+
+    P3 = layers.Add()([
+        layers.UpSampling2D(size=(2,2))(P4),
+        layers.Conv2D(config.PIRAMID_SIZE, kernel_size=(1,1))(C3)
+    ])
+
+    P2 = layers.Add()([
+        layers.UpSampling2D(size=(2,2))(P3),
+        layers.Conv2D(config.PIRAMID_SIZE, kernel_size=(1,1))(C2)
+    ])
+
+    P2 = layers.Conv2D(config.PIRAMID_SIZE, kernel_size=(3,3), padding="SAME")(P2)
+    P3 = layers.Conv2D(config.PIRAMID_SIZE, kernel_size=(3,3), padding="SAME")(P3)
+    P4 = layers.Conv2D(config.PIRAMID_SIZE, kernel_size=(3,3), padding="SAME")(P4)
+    P5 = layers.Conv2D(config.PIRAMID_SIZE, kernel_size=(3,3), padding="SAME")(P5)
+    #P6 for anchor scale in RPN
+    P6 = layers.MaxPooling2D(pool_size=(1,1), strides=2)(p5)
+
+    return [P2,P3,P4,P5,P6]
