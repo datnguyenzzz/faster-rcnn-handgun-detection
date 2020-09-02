@@ -17,8 +17,15 @@ class TrainConfig():
         self.DETECTION_MIN_CONFIDENCE = 0.9
         self.IMAGE_SHAPE = [800,800,3]
 
+        #for FPN layer
         self.TRAIN_BN = False
         self.PIRAMID_SIZE = 256
+        self.BACKBONE_STRIDES = [4,8,16,32,64] #C2,C3,C4,C5,C6
+
+        #for anchors
+        self.ANCHOR_SCALES = [32,64,128,256,512]
+        self.ANCHOR_RATIOS = [0.5,1,2]
+        self.ANCHOR_STRIDE = 1
 
 class InferenceConfig():
     def __init__(self):
