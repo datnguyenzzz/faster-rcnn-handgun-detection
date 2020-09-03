@@ -1,0 +1,9 @@
+sinh anchor vao trong cac layer (model.py/57)
+
+util/generate_anchor
+
+The RPN works on the feature map (output of CNN) and defines
+the anchors on the feature map, but the final anchor boxes are
+created with respect to the original image.
+
+1923

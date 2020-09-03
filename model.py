@@ -15,7 +15,7 @@ class RCNN():
         self.anchor_cache = {} #dict
         self.model = self.build(mode=mode, config=config)
 
-    def gen_anchors(self,image_shape):
+    def get_anchors(self,image_shape):
 
         backbone_shape = np.array([[int(math.ceil(image_shape[0]/stride)),int(math.ceil(image_shape[1]/stride))] for stride in self.config.BACKBONE_STRIDES])
 
@@ -25,6 +25,10 @@ class RCNN():
                                              self.config.ANCHOR_STRIDE,
                                              backbone_shape,
                                              self.config.BACKBONE_STRIDES)
+
+            self.anchor_cache[tuple(image_shape)] = utils.norm_boxes(anchors,image_shape[:2])
+
+        return self.anchor_cache[tuple(image_shape)]
 
     def build(self,mode,config):
         h,w = config.IMAGE_SHAPE[:2]
@@ -53,8 +57,8 @@ class RCNN():
             #normalize ground truth boxes
             gt_boxes = layers.Lambda(lambda x : utils.norm_boxes(x,K.shape(input_image)[1:3]))(input_gt_boxes)
 
-            #anchors
-            anchors = self.gen_anchors(config.IMAGE_SHAPE)
+            #anchors for RPN
+            anchors = self.get_anchors(config.IMAGE_SHAPE)
 
         elif mode == "inference":
             input_anchors = keras.Input(shape = [None,4], dtype=tf.float32)
