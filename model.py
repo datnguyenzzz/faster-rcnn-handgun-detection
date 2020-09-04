@@ -76,4 +76,18 @@ class RCNN():
         """
         outputs = RPN.build_graph(input_feature,len(config.ANCHOR_RATIOS),config.ANCHOR_STRIDE)
 
-        rpn_model = keras.Model(inputs=[input_feature], outputs = outputs)
+        RPN_model = keras.Model(inputs=[input_feature], outputs = outputs)
+
+        """
+        In FPN, we generate a pyramid of feature maps. We apply the RPN (described in the previous section)
+        to generate ROIs. Based on the size of the ROI,
+        we select the feature map layer in the most proper scale to extract the feature patches.
+        """
+        layer_outputs = []
+        for x in RPN_feature:
+            layer_outputs.append(RPN_model([x]))
+
+        layer_outputs = list(zip(*layer_outputs))
+        layer_outputs = [layers.Concatenate(axis=1)(list(o)) for o in layer_outputs]
+
+        rpn_class_cls, rpn_probs, rpn_bbox = layer_outputs
