@@ -63,7 +63,7 @@ def halved_block(input, filters, strides=(2,2), use_bias=True, train_bn = True):
 def build_layers(input, train_bn=True):
 
     x = layers.ZeroPadding2D((3,3))(input)
-    x = layers.Conv2D(64, kernel_size=(7,7), strides=(2,2), use_bias=True)(x)
+    x = layers.Conv2D(filters=64, kernel_size=(7,7), strides=(2,2), use_bias=True)(x)
     x = BatchNorm()(x,training=train_bn)
     x = layers.Activation('relu')(x)
     Stage1 = x = layers.MaxPooling2D((3,3), strides=(2,2), padding="same")(x)
@@ -93,23 +93,23 @@ def build_FPN(C1,C2,C3,C4,C5,config):
 
     P4 = layers.Add()([
         layers.UpSampling2D(size=(2,2))(P5),
-        layers.Conv2D(config.PIRAMID_SIZE, kernel_size=(1,1))(C4)
+        layers.Conv2D(filters=config.PIRAMID_SIZE, kernel_size=(1,1))(C4)
     ])
 
     P3 = layers.Add()([
         layers.UpSampling2D(size=(2,2))(P4),
-        layers.Conv2D(config.PIRAMID_SIZE, kernel_size=(1,1))(C3)
+        layers.Conv2D(filters=config.PIRAMID_SIZE, kernel_size=(1,1))(C3)
     ])
 
     P2 = layers.Add()([
         layers.UpSampling2D(size=(2,2))(P3),
-        layers.Conv2D(config.PIRAMID_SIZE, kernel_size=(1,1))(C2)
+        layers.Conv2D(filters=config.PIRAMID_SIZE, kernel_size=(1,1))(C2)
     ])
 
-    P2 = layers.Conv2D(config.PIRAMID_SIZE, kernel_size=(3,3), padding="SAME")(P2)
-    P3 = layers.Conv2D(config.PIRAMID_SIZE, kernel_size=(3,3), padding="SAME")(P3)
-    P4 = layers.Conv2D(config.PIRAMID_SIZE, kernel_size=(3,3), padding="SAME")(P4)
-    P5 = layers.Conv2D(config.PIRAMID_SIZE, kernel_size=(3,3), padding="SAME")(P5)
+    P2 = layers.Conv2D(filters=config.PIRAMID_SIZE, kernel_size=(3,3), padding="SAME")(P2)
+    P3 = layers.Conv2D(filters=config.PIRAMID_SIZE, kernel_size=(3,3), padding="SAME")(P3)
+    P4 = layers.Conv2D(filters=config.PIRAMID_SIZE, kernel_size=(3,3), padding="SAME")(P4)
+    P5 = layers.Conv2D(filters=config.PIRAMID_SIZE, kernel_size=(3,3), padding="SAME")(P5)
     #P6 for anchor scale in RPN
     P6 = layers.MaxPooling2D(pool_size=(1,1), strides=2)(p5)
 
