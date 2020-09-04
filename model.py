@@ -6,6 +6,7 @@ import numpy as np
 import math
 #######customize########
 import resnet101
+import RPN
 import utils
 
 class RCNN():
@@ -91,3 +92,9 @@ class RCNN():
         layer_outputs = [layers.Concatenate(axis=1)(list(o)) for o in layer_outputs]
 
         rpn_class_cls, rpn_probs, rpn_bbox = layer_outputs
+
+        #Proposal layer
+        if mode == "training":
+            num_proposal = config.NUM_ROI_TRAINING
+        elif mode == "inference":
+            num_proposal = config.NUM_ROI_INFERENCE

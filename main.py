@@ -27,6 +27,11 @@ class TrainConfig():
         self.ANCHOR_RATIOS = [0.5,1,2]
         self.ANCHOR_STRIDE = 1
 
+        #for ROI
+        self.NUM_ROI_TRAINING = 2000
+        self.NUM_ROI_INFERENCE = 1000
+        self.NMS_THRESHOLD = 0.7 #Non-Max suppression for choosing ROI 
+
 class InferenceConfig():
     def __init__(self):
         self.GPU_NUM = 1
