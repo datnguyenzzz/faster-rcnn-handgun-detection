@@ -60,5 +60,17 @@ class RCNN():
             #anchors for RPN
             anchors = self.get_anchors(config.IMAGE_SHAPE)
 
+            anchors = layers.Lambda(lambda x : tf.Variable(anchors))(input_image)
+
         elif mode == "inference":
-            input_anchors = keras.Input(shape = [None,4], dtype=tf.float32)
+            #will do later
+
+        #RPN Keras model
+        input_feature = keras.Input(shape=[None,None,config.PIRAMID_SIZE])
+
+        """
+        rpn_class_cls: anchor class classifier
+        rpn_probs: anchor classifier probability
+        rpn_bbox: anchor bounding box
+        """
+        [rpn_class_cls, rpn_probs, rpn_bbox] = RPN.build_graph(input_feature,len(config.ANCHOR_RATIOS),config.ANCHOR_STRIDE)
