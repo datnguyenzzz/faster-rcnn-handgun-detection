@@ -37,7 +37,7 @@ class RCNN():
         input_image = keras.Input(shape = [None,None,config.IMAGE_SHAPE[2]])
 
         #resnet layer
-        C1,C2,C3,C4,C5 = resnet101.build_layers(input = input_image, config.TRAIN_BN)
+        C1,C2,C3,C4,C5 = resnet101.build_layers(input = input_image, config=config.TRAIN_BN)
         #FPN
         P2,P3,P4,P5,P6 = resnet101.build_FPN(C1=C1,C2=C2,C3=C3,C4=C4,C5=C5,config=config)
 
@@ -64,6 +64,7 @@ class RCNN():
 
         elif mode == "inference":
             #will do later
+            x=1+1
 
         #RPN Keras model
         input_feature = keras.Input(shape=[None,None,config.PIRAMID_SIZE])
@@ -73,4 +74,6 @@ class RCNN():
         rpn_probs: anchor classifier probability
         rpn_bbox: anchor bounding box
         """
-        [rpn_class_cls, rpn_probs, rpn_bbox] = RPN.build_graph(input_feature,len(config.ANCHOR_RATIOS),config.ANCHOR_STRIDE)
+        outputs = RPN.build_graph(input_feature,len(config.ANCHOR_RATIOS),config.ANCHOR_STRIDE)
+
+        rpn_model = keras.Model(inputs=[input_feature], outputs = outputs)
