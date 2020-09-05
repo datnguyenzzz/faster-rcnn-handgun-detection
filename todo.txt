@@ -1,2 +1,6 @@
 generate ROI
 1947
+
+have list anchor and bbox, class_probs
+#1 find k largest probabilities (minimum set in config)
+#1 slice batch 

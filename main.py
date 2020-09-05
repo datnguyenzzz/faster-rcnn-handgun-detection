@@ -11,7 +11,7 @@ COCO_WEIGHTS = os.path.join(ROOT_DIR,"pretrained\\resnet101_weights_th.h5")
 
 class TrainConfig():
     def __init__(self):
-        self.IMAGES_PER_GPU = 1
+        self.IMAGES_PER_GPU = 2
         self.NUM_CLASSES = 2
         self.BATCH_SIZE = 100
         self.DETECTION_MIN_CONFIDENCE = 0.9
@@ -30,7 +30,9 @@ class TrainConfig():
         #for ROI
         self.NUM_ROI_TRAINING = 2000
         self.NUM_ROI_INFERENCE = 1000
-        self.NMS_THRESHOLD = 0.7 #Non-Max suppression for choosing ROI 
+        self.NMS_THRESHOLD = 0.7 #Non-Max suppression for choosing ROI
+        self.BBOX_STD_DEV = np.array([0.1,0.1,0.2,0.2]) #standard deviation
+        self.PRE_NMS_LIMIT = 6000
 
 class InferenceConfig():
     def __init__(self):
