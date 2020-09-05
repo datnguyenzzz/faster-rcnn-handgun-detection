@@ -93,6 +93,7 @@ class RCNN():
 
         rpn_class_cls, rpn_probs, rpn_bbox = layer_outputs
 
+
         #Proposal layer
         if mode == "training":
             num_proposal = config.NUM_ROI_TRAINING
