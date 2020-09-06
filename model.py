@@ -73,7 +73,7 @@ class RCNN():
         """
         rpn_class_cls: anchor class classifier
         rpn_probs: anchor classifier probability
-        rpn_bbox: anchor bounding box
+        rpn_bbox_offset: anchor bounding box offset
         """
         outputs = RPN.build_graph(input_feature,len(config.ANCHOR_RATIOS),config.ANCHOR_STRIDE)
 
@@ -91,7 +91,8 @@ class RCNN():
         layer_outputs = list(zip(*layer_outputs))
         layer_outputs = [layers.Concatenate(axis=1)(list(o)) for o in layer_outputs]
 
-        rpn_class_cls, rpn_probs, rpn_bbox = layer_outputs
+        #rpn_class_cls, rpn_probs, rpn_bbox = layer_outputs
+        rpn_probs, rpn_bbox_offset = layer_outputs
 
 
         #Proposal layer
