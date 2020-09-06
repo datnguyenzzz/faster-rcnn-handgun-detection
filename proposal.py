@@ -18,7 +18,7 @@ class ProposalLayer(layers.Layer):
         bbox_offset = input[1]
         bbox_offset = bbox_offset * np.reshape(self.config.BBOX_STD_DEV, [1,1,4])
 
-        anchors = input[2]
+        anchors = input[2] #normalize already
 
         pre_nms_limit = K.minimum(self.config.PRE_NMS_LIMIT, tf.shape(anchors)[1])
         ids = tf.math.top_k(input=class_probs, k=pre_nms_limit, sorted=True).indices #find k largest probabilities
@@ -29,5 +29,8 @@ class ProposalLayer(layers.Layer):
         anchors = utils.batch_slice([anchors, ids], lambda x,y:tf.gather(params=x, indices=y), self.config.IMAGES_PER_GPU)
 
         #apply bbox to anchor boxes to get better bounding box closer to the closed Foreground object.
-
         bboxes = utils.batch_slice([anchors,bbox_offset], lambda x,y : utils.apply_bbox_offset(anchors=x,bbox_offset=y), self.config.IMAGES_PER_GPU)
+
+        #clip to 0..1 range
+        window = np.array([0,0,1,1],dtype=np.float32)
+        bboxes = utils.batch_slice(bboxes, lambda x: utils.clip_boxes(x,window), self.config.IMAGES_PER_GPU)

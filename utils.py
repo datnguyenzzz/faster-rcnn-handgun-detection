@@ -82,3 +82,16 @@ def apply_bbox_offset(anchors, bbox_offset):
     x2 = x1 + w
     res = tf.stack([y1,x1,y2,x2],axis=1)
     return res
+
+def clip_boxes(boxes, window):
+    wy1,wx1,wy2,wx2 = tf.split(window,4)
+    y1,x1,y2,x2 = tf.split(boxes,4,axis=1)
+
+    y1 = tf.maximum(tf.minimum(y1,wy2),wy1)
+    x1 = tf.maximum(tf.minimum(x1,wx2),wx1)
+    y2 = tf.maximum(tf.minimum(y2,wy2),wy1)
+    x2 = tf.maximum(tf.minimum(x2,wx2),wx1)
+
+    clipped = tf.concat([y1,x1,y2,x2],axis=1)
+    clipped.set_shape((clipped.shape[0],4))
+    return clipped
