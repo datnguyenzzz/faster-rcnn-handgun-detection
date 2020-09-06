@@ -1,6 +1,10 @@
-generate ROI
-1947
-
-have list anchor and bbox, class_probs
-#1 find k largest probabilities (minimum set in config)
-#1 slice batch 
+1) Build Faster-RCNN Model
+FOR TRAINING
+1.1) input layer done
+1.2) resnet 101 done
+1,3) FPN done
+=> RPN and RCNN feature done
+1.4) anchors boxes done
+1.5) RPN nn done
+1.6) anchor boxes + RPN reg result => better boxes = ROI done
+1.7) combine all together
