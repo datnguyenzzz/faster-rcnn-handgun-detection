@@ -8,6 +8,7 @@ import math
 import resnet101
 import RPN
 import utils
+from proposal import ProposalLayer
 
 class RCNN():
     def __init__(self,mode,config):
@@ -100,3 +101,5 @@ class RCNN():
             num_proposal = config.NUM_ROI_TRAINING
         elif mode == "inference":
             num_proposal = config.NUM_ROI_INFERENCE
+
+        ROIS = ProposalLayer(num_proposal=num_proposal, nms_threshold=config.NMS_THRESHOLD, config=config)([rpn_probs,rpn_bbox_offset,anchors])
