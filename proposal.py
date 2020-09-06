@@ -34,3 +34,21 @@ class ProposalLayer(layers.Layer):
         #clip to 0..1 range
         window = np.array([0,0,1,1],dtype=np.float32)
         bboxes = utils.batch_slice(bboxes, lambda x: utils.clip_boxes(x,window), self.config.IMAGES_PER_GPU)
+
+        #generate proposal by NMS
+
+        def nms(boxes,scores):
+            ids = tf.image.non_max_suppression(boxes = boxes, scores = scores,
+                                               max_output_size_per_class = num_proposal,
+                                               iou_threshold = nms_threshold)
+            proposals = tf.gather(boxes,ids)
+            padding = tf.maximum(self.num_proposal - tf.shape(proposals)[0], 0)
+            proposals = tf.pad(proposals, [(0, padding), (0, 0)])
+            return proposals
+
+        proposals = utils.batch_slice([bboxes,class_probs], nms, self.config.IMAGES_PER_GPU)
+
+        return proposals
+
+    def compute_output_shape(self, input_shape):
+        return (None,self.num_proposal,4)
