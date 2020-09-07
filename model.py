@@ -9,6 +9,7 @@ import resnet101
 import RPN
 import utils
 from proposal import ProposalLayer
+from detection import DetectionLayer
 
 class RCNN():
     def __init__(self,mode,config):
@@ -65,7 +66,11 @@ class RCNN():
             anchors = layers.Lambda(lambda x : tf.Variable(anchors))(input_image)
 
         elif mode == "inference":
-            #will do later
+            """
+            ###################################
+            will do later
+            ###################################
+            """
             x=1+1
 
         #RPN Keras model
@@ -102,4 +107,17 @@ class RCNN():
         elif mode == "inference":
             num_proposal = config.NUM_ROI_INFERENCE
 
-        ROIS = ProposalLayer(num_proposal=num_proposal, nms_threshold=config.NMS_THRESHOLD, config=config)([rpn_probs,rpn_bbox_offset,anchors])
+        ROIS_proposals = ProposalLayer(num_proposal=num_proposal, nms_threshold=config.NMS_THRESHOLD, config=config)([rpn_probs,rpn_bbox_offset,anchors])
+
+        #combine together
+        if mode == "training":
+            #Subsamples proposals and generates target box refinement, class_ids 1.7
+            rois, target_class_ids, target_bbox = DetectionLayer(config)([ROIS_proposals,input_gt_ids,gt_boxes])
+        elif mode =="inference":
+            # will do later
+            """
+            ####################################################
+            will do later
+            ####################################################
+            """
+            x=1+1

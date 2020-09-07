@@ -6,5 +6,7 @@ FOR TRAINING
 => RPN and RCNN feature done
 1.4) anchors boxes done
 1.5) RPN nn done
-1.6) anchor boxes + RPN reg result => better boxes = ROI done
-1.7) combine all together
+1.6) anchor boxes + RPN reg result => better boxes + NMS = ROI done
+1.7) subsample anchor and class ids
+FOR INFERENCE
+model.py 68 111
