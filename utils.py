@@ -95,3 +95,11 @@ def clip_boxes(boxes, window):
     clipped = tf.concat([y1,x1,y2,x2],axis=1)
     clipped.set_shape((clipped.shape[0],4))
     return clipped
+
+def remove_zero_padding(boxes):
+    is_zeros = tf.cast(tf.math.reduce_sum(tf.math.abs(boxes), axis=1), tf.bool)
+    boxes = tf.boolean_mask(boxes, is_zeros)
+    return boxes, is_zeros
+
+#a=tf.constant([[0,0,0,0],[0,1,2,0],[0,3,4,0],[0,0,0,0]])
+#print(remove_zero_padding(a))

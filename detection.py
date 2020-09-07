@@ -5,9 +5,13 @@ from tensorflow.keras import backend as K
 import utils
 
 def detection_graph(rois,gt_ids,gt_boxes,config):
-    
+    #remove zero padding
+    rois,_ = utils.remove_zero_padding(rois)
+    gt_boxes,is_zeros = utils.remove_zero_padding(gt_boxes)
+    gt_ids = tf.boolean_mask(gt_ids, is_zeros)
 
-class ProposalLayer(layers.Layer):
+
+class DetectionLayer(layers.Layer):
     def __init__(self,config,**kwargs):
         super(ProposalLayer,self).__init__(**kwargs)
         self.config = config
