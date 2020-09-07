@@ -59,7 +59,16 @@ def detection_graph(rois,gt_ids,gt_boxes,config):
     bbox_offset = utils.compute_bbox_offset(positive_rois, roi_gt_boxes)
     bbox_offset /= config.BBOX_STD_DEV
 
+    rois = tf.concat([positive_rois,negative_rois], axis=0)
+    N = tf.shape(negative_rois)[0]
+    P = tf.maximum(config.TRAIN_ROIS_PER_IMAGE - tf.shape(rois)[0],0)
 
+    rois = tf.pad(rois, tf.constant([[0, P], [0,0]]))
+    roi_gt_boxes = tf.pad(roi_gt_boxes, tf.constant([[0, N+P], [0,0]]))
+    roi_gt_ids = tf.pad(roi_gt_ids, tf.constant([0, N+P]))
+    bbox_offset = tf.pad(bbox_offset, tf.constant([[0, N+P], [0,0]]))
+
+    return rois, rois_gt_ids, bbox_offset
 
 class DetectionLayer(layers.Layer):
     def __init__(self,config,**kwargs):

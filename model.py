@@ -112,7 +112,9 @@ class RCNN():
         #combine together
         if mode == "training":
             #Subsamples proposals and generates target box refinement, class_ids 1.7
-            rois, target_class_ids, target_bbox = DetectionLayer(config)([ROIS_proposals,input_gt_ids,gt_boxes])
+            #ratio postive/negative rois = 1/3 (threshold = 0.5)
+            #target_bbox = offset from positive rois to it's closest gt_box
+            rois, target_ids, target_bbox = DetectionLayer(config)([ROIS_proposals,input_gt_ids,gt_boxes])
         elif mode =="inference":
             # will do later
             """
