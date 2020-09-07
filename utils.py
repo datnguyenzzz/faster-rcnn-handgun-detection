@@ -101,5 +101,26 @@ def remove_zero_padding(boxes):
     boxes = tf.boolean_mask(boxes, is_zeros)
     return boxes, is_zeros
 
+def IoU_overlap(boxes1, boxes2):
+    #tile boxes2 and loop boxes1
+    box1 = tf.reshape(tf.tile(tf.expand_dims(boxes1,1), [1,1,tf.shape(boxes2)[0]]), [-1,4])
+    box2 = tf.tile(boxes2, [tf.shape(boxes1)[0],1])
+
+    y11,x11,y21,x21 = tf.split(box1,4,axis=1)
+    y12,x12,y22,x22 = tf.split(box2,4,axis=1)
+
+    y1 = tf.maximum(y11,y12)
+    x1 = tf.maximum(x11,x12)
+    y2 = tf.minimum(y21,y22)
+    x2 = tf.minimum(x21,x22)
+
+    I = tf.maximum(x2-x1,0) * tf.maximum(y2-y1,0)
+    U = (y21-y11)*(x21-x11) + (y22-y12)*(x22-x12) - I
+    IoU = I/U
+
+    IoU = tf.reshape(IoU, [tf.shape(boxes1)[0], tf.shape(boxes2)[0]])
+    return IoU
+
+
 #a=tf.constant([[0,0,0,0],[0,1,2,0],[0,3,4,0],[0,0,0,0]])
 #print(remove_zero_padding(a))

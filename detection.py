@@ -10,6 +10,19 @@ def detection_graph(rois,gt_ids,gt_boxes,config):
     gt_boxes,is_zeros = utils.remove_zero_padding(gt_boxes)
     gt_ids = tf.boolean_mask(gt_ids, is_zeros)
 
+    #handle crowd
+    # A crowd box in COCO is a bounding box around several instances. Exclude
+    # them from training. A crowd box is given a negative class ID.
+    crowd_ids = tf.where(gt_ids < 0)[:,0]
+    non_crowd_ids = tf.where(gt_ids > 0)[:,0]
+    crowd_gt_boxes = tf.gather(gt_boxes, crowd_ids)
+    gt_ids = tf.gather(gt_ids, non_crowd_ids)
+    gt_boxes = tf.gather(gt_boxes,non_crowd_ids)
+
+    #compute IoU
+    IoU_non_crowd = utils.IoU_overlap(rois,gt_boxes)
+    IoU_crowd = utils.IoU_overlap(rois,crowd_gt_boxes)
+
 
 class DetectionLayer(layers.Layer):
     def __init__(self,config,**kwargs):
