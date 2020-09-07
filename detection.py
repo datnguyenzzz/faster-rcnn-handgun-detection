@@ -41,6 +41,21 @@ def detection_graph(rois,gt_ids,gt_boxes,config):
     negative_num = tf.cast(negative_ratio * tf.cast(positive_num, tf.float32), tf.int32) - positive_num
     negative_ids = tf.random_shuffle(negative_ids)[:negative_num]
 
+    positive_rois = tf.gather(rois, positive_ids)
+    negative_rois = tf.gather(rois, negative_ids)
+
+    #aplly +rois to GT boxes
+    positive_IoU_non_crowd = tf.gather(IoU_non_crowd, positive_ids)
+    #find max IoU value roi
+    func = tf.cond(
+        tf.greater(tf.shape(positive_IoU_non_crowd)[1],0),
+        true_fn = lambda: tf.math.argmax(positive_IoU_non_crowd, axis=1),
+        false_fn = lambda: tf.cast(tf.constant([]),tf.int64)
+    )
+    #find gt boxes relate with maximum IoU roi 
+    roi_gt_boxes = tf.gather(gt_boxes, func)
+    roi_gt_ids = tf.gather(gt_ids, func)
+
 
 
 class DetectionLayer(layers.Layer):
