@@ -52,9 +52,12 @@ def detection_graph(rois,gt_ids,gt_boxes,config):
         true_fn = lambda: tf.math.argmax(positive_IoU_non_crowd, axis=1),
         false_fn = lambda: tf.cast(tf.constant([]),tf.int64)
     )
-    #find gt boxes relate with maximum IoU roi 
+    #find gt boxes relate with maximum IoU roi
     roi_gt_boxes = tf.gather(gt_boxes, func)
     roi_gt_ids = tf.gather(gt_ids, func)
+    #compute offset from positive rois to it's closest gt bbox
+    bbox_offset = utils.compute_bbox_offset(positive_rois, roi_gt_boxes)
+    bbox_offset /= config.BBOX_STD_DEV
 
 
 

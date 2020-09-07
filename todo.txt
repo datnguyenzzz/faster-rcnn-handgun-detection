@@ -7,6 +7,6 @@ FOR TRAINING
 1.4) anchors boxes done
 1.5) RPN nn done
 1.6) anchor boxes + RPN reg result => better boxes + NMS = ROI done
-1.7) subsample anchor and class ids
+1.7) Detectionlayer: subsample anchor and class ids. From ROIs list => Positive/negative ROIs
 FOR INFERENCE
 model.py 68 111

@@ -121,6 +121,33 @@ def IoU_overlap(boxes1, boxes2):
     IoU = tf.reshape(IoU, [tf.shape(boxes1)[0], tf.shape(boxes2)[0]])
     return IoU
 
+def compute_bbox_offset(rois,gt_boxes):
+    """
+    input form = (y1,x1,y2,x2)
+    return offset = (dy,dx,log(hd),log(dw))
+    """
+    rois = tf.cast(rois,tf.float32)
+    gt_boxes = tf.cast(gt_boxes,tf.float32)
+    h = rois[:,2] - rois[:,0]
+    w = rois[:,3] - rois[:,1]
+    center_y = rois[:,0] + 0.5 * h
+    center_x = rois[:,1] + 0.5 * w
 
-#a=tf.constant([[0,0,0,0],[0,1,2,0],[0,3,4,0],[0,0,0,0]])
-#print(remove_zero_padding(a))
+    gt_h = gt_boxes[:,2] - gt_boxes[:,0]
+    gt_w = gt_boxes[:,3] - gt_boxes[:,1]
+    gt_center_y = gt_boxes[:,0] + 0.5 * gt_h
+    gt_center_x = gt_boxes[:,1] + 0.5 * gt_w
+
+    dy = (gt_center_y - center_y) / h
+    dx = (gt_center_x - center_x) / w
+    dh = tf.log(gt_h / h)
+    dw = tf.log(gt_w / w)
+
+    res = tf.stack([dy,dx,dh,dw], axis = 1)
+    return res
+
+
+
+
+a=tf.constant([[0,0,0,0],[0,1,2,0],[0,3,4,0],[0,0,0,0]])
+print(tf.math.argmax(a))

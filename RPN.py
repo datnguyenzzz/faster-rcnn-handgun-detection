@@ -13,7 +13,7 @@ def build_graph(input_feature, anchor_per_window, anchor_stride):
     #probability background/foregound
     rpn_probs = layers.Activation('softmax')(rpn_class_cls)
 
-    #rgs bounding box
+    #rgs bounding box offset
     x = layers.Conv2D(filters=4*anchor_per_window, kernel_size=(1,1), padding="valid", activation="linear")(shared)
     rpn_bbox = layers.Lambda(lambda t : tf.reshape(t, [tf.shape(t)[0],-1,4]))(x)
 
