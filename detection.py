@@ -19,9 +19,20 @@ def detection_graph(rois,gt_ids,gt_boxes,config):
     gt_ids = tf.gather(gt_ids, non_crowd_ids)
     gt_boxes = tf.gather(gt_boxes,non_crowd_ids)
 
-    #compute IoU
+    #compute IoU  between rois and crowd/non crowd GT boxes
     IoU_non_crowd = utils.IoU_overlap(rois,gt_boxes)
     IoU_crowd = utils.IoU_overlap(rois,crowd_gt_boxes)
+    IoU_crowd_max = tf.reduce_max(IoU_crowd,axis=1)
+
+    IoU_non_crowd_max = tf.reduce_max(IoU_non_crowd,axis=1)
+    #positive rois
+    positive_ids = tf.where(IoU_non_crowd_max >= 0.5)[:,0]
+    #negative rois
+    negative_ids = tf.where(tf.logical_and(IoU_non_crowd_max < 0.5, IoU_crowd_max < 0.001))[:,0]
+
+
+
+
 
 
 class DetectionLayer(layers.Layer):
