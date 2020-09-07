@@ -33,6 +33,9 @@ class TrainConfig():
         self.NMS_THRESHOLD = 0.7 #Non-Max suppression for choosing ROI
         self.BBOX_STD_DEV = np.array([0.1,0.1,0.2,0.2]) #standard deviation
         self.PRE_NMS_LIMIT = 6000
+        self.TRAIN_ROIS_PER_IMAGE = 200
+        self.POSITIVE_ROI_RATIO = 0.33
+
 
 class InferenceConfig():
     def __init__(self):

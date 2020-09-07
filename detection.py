@@ -30,8 +30,16 @@ def detection_graph(rois,gt_ids,gt_boxes,config):
     #negative rois
     negative_ids = tf.where(tf.logical_and(IoU_non_crowd_max < 0.5, IoU_crowd_max < 0.001))[:,0]
 
-
-
+    #subsample ROI. Aim for ratio positive/negative = 1/3
+    positive_num = int(config.TRAIN_ROIS_PER_IMAGE * config.POSITIVE_ROI_RATIO)
+    #positives
+    positive_ids = tf.random_shuffle(positive_ids)[:positive_num]
+    positive_num = tf.shape(positive_ids)[0]
+    #negatives
+    #num+ = r+ * all -> all = num+ / r+ num- = (1-r+)*all -> num- = (1-r+) * num+/r+ = 1/r+ * num+ - num+
+    negative_ratio = 1.0 / config.POSITIVE_ROI_RATIO
+    negative_num = tf.cast(negative_ratio * tf.cast(positive_num, tf.float32), tf.int32) - positive_num
+    negative_ids = tf.random_shuffle(negative_ids)[:negative_num]
 
 
 
