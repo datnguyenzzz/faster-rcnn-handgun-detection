@@ -27,8 +27,16 @@ def fpn_classifier(rois, features, image_meta, pool_size, num_classes, train_bn=
     x = layers.TimeDistributed(BatchNorm())(x, training=train_bn)
     x = layers.Activation('relu')(x)
 
-    shared = KL.Lambda(lambda x: K.squeeze(K.squeeze(x, 3), 2))(x)
+    shared = layers.Lambda(lambda x: K.squeeze(K.squeeze(x, 3), 2))(x) #h=w=1 no need that information
 
+    rcnn_class_ids = layers.TimeDistributed(layers.Dense(num_classes))(shared)
+    rcnn_probs = layers.TimeDistributed(layers.Activation('softmax'))(rcnn_class_ids)
+
+    rcnn_bbox = layers.TimeDistributed(layers.Dense(num_classes * 4, activation='linear'))(shared)
+    shape = K.int_shape(rcnn_bbox)
+    rcnn_bbox = layers.Reshape((s[1],num_classes,4))(rcnn_bbox) #[batch, num_rois, num_class, (dy,dx,log(dh),log(dw))]
+
+    return rcnn_probs, rcnn_bbox
 
 
 class RCNN():
@@ -140,7 +148,7 @@ class RCNN():
             rois, target_ids, target_bbox = DetectionLayer(config)([ROIS_proposals,input_gt_ids,gt_boxes])
 
             #classification and regression ROIs after RPN through FPN
-            RCNN_class_probs, RCNN_bbox = fpn_classifier(rois, RCNN_feature, input_image_meta,
+            rcnn_class_probs, rcnn_bbox = fpn_classifier(rois, RCNN_feature, input_image_meta,
                                                                          config.POOL_SIZE,self.NUM_CLASSES,
                                                                          train_bn=config.TRAIN_BN,
                                                                          fc_layers_size=config.FPN_CLS_FC_LAYERS)
