@@ -23,5 +23,22 @@ class RoiAlignLayer(layers.Layer):
         spec = utils.log2(tf.square(h*w) / (224.0 / tf.square(tf.cast(image_shape[0] * image_shape[1], tf.float32))))
         roi_level = tf.minimum(5, tf.maximum(2, 4 + tf.cast(tf.round(spec), tf.int32)))
 
+        pooled=[]
+        roi_to_level=[]
+        for i,level in enumerate(range(2,6)):
+            ix = tf.where(tf.equal(roi_level, level))
+            roi_with_level = tf.gather_nd(rois,ix) #list roi with "level" feature
+
+            roi_ids = tf.cast(ix[:,0], tf.int32)
+            roi_to_level.append(ix) #map level with roi list
+
+            #stop gradient propogation
+            roi_with_level = tf.stop_gradient(roi_with_level)
+            roi_ids = tf.stop_gradient(roi_ids)
+
+            pooled.append(tf.image.crop_and_resize(features[i], roi_with_level, roi_ids, self.pool_shape, method = "bilinear"))
+
+        pooled = tf.concat(pooled, axis=0)
+
     def compute_output_shape(self, input_shape):
         x=1
