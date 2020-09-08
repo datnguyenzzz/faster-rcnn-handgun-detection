@@ -4,16 +4,18 @@ from tensorflow.keras import layers
 from tensorflow.keras import backend as K
 import numpy as np
 import math
+#######Layers###########
+from proposal import ProposalLayer
+from detection import DetectionLayer
+from roialign import RoiAlignLayer
 #######customize########
 import resnet101
 import RPN
 import utils
-from proposal import ProposalLayer
-from detection import DetectionLayer
 
 def fpn_classifier(rois, features, image_meta, pool_size, num_classes, train_bn=True, fc_layers_size = 1024):
     #ROI pooling + projectation = ROI align
-    x = utils.RoiAlignLayer([pool_size,pool_size])([rois,image_meta] + features)
+    x = RoiAlignLayer([pool_size,pool_size])([rois,image_meta] + features)
 
 class RCNN():
     def __init__(self,mode,config):

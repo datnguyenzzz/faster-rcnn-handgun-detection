@@ -146,8 +146,27 @@ def compute_bbox_offset(rois,gt_boxes):
     res = tf.stack([dy,dx,dh,dw], axis = 1)
     return res
 
+def parse_image_meta(meta):
+    image_id = meta[:,0]
+    original_shape = meta[:,1:4]
+    image_shape = meta[:,4:7]
+    window = meta[:,7:11]
+    scale = meta[:,11]
+    class_ids = meta[:,12:]
+    return {
+        "image_id": image_id,
+        "original_image_shape": original_image_shape,
+        "image_shape": image_shape,
+        "window": window,
+        "scale": scale,
+        "class_ids": active_class_ids,
+    }
+
+def log2(x):
+    return tf.log(x) / tf.log(2.0)
 
 
 
-a=tf.constant([[0,0,0,0],[0,1,2,0],[0,3,4,0],[0,0,0,0]])
-print(tf.math.argmax(a))
+
+#a=tf.constant([[0,0,0,0],[0,1,2,0],[0,3,4,0],[0,0,0,0]])
+#print(tf.math.argmax(a))
