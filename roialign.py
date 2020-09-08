@@ -40,5 +40,20 @@ class RoiAlignLayer(layers.Layer):
 
         pooled = tf.concat(pooled, axis=0)
 
+        roi_to_level =  tf.concat(roi_to_level, axis=0)
+        roi_range = tf.expand_dims(tf.range(tf.shape(roi_to_level)[0]),1)
+        roi_to_level = tf.concat([tf.cast(roi_to_level, tf.int32), roi_range], axis=1)
+
+        ## Rearrange pooled features to match the order of the original boxes
+        # Sort roi_to_level by batch then box index
+        sorting_ts = roi_to_level[:,0] * 100000 + roi_to_level[:,1]
+        ix = tf.nn.top_k(sorting_ts, k = tf.shape(roi_to_level)[0]).indices[::-1]
+        ix = tf.gather(roi_to_level[:,2],ix)
+        pooled = tf.gather(pooled,ix)
+
+        shape = tf.concat([tf.shape(rois)[:2], tf.shape(pooled)[1:]], axis=0)
+        pooled = tf.reshape(pooled, shape)
+        return pooled
+
     def compute_output_shape(self, input_shape):
-        x=1
+        return input_shape[0][:2] + self.pool_shape + (input_shape[2][-1], )
