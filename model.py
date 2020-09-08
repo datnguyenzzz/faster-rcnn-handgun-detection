@@ -11,7 +11,9 @@ import utils
 from proposal import ProposalLayer
 from detection import DetectionLayer
 
-def fpn_classifier()
+def fpn_classifier(rois, features, image_meta, pool_size, num_classes, train_bn=True, fc_layers_size = 1024):
+    #ROI pooling + projectation = ROI align
+    x = utils.RoiAlignLayer([pool_size,pool_size])([rois,image_meta] + features)
 
 class RCNN():
     def __init__(self,mode,config):
