@@ -72,7 +72,7 @@ def detection_graph(rois,gt_ids,gt_boxes,config):
 
 class DetectionLayer(layers.Layer):
     def __init__(self,config,**kwargs):
-        super(ProposalLayer,self).__init__(**kwargs)
+        super(DetectionLayer,self).__init__(**kwargs)
         self.config = config
 
     def call(self,input):

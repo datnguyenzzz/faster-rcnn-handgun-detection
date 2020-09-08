@@ -8,6 +8,7 @@ import math
 from proposal import ProposalLayer
 from detection import DetectionLayer
 from roialign import RoiAlignLayer
+from utils import BatchNorm
 #######customize########
 import resnet101
 import RPN
@@ -16,6 +17,19 @@ import utils
 def fpn_classifier(rois, features, image_meta, pool_size, num_classes, train_bn=True, fc_layers_size = 1024):
     #ROI pooling + projectation = ROI align
     x = RoiAlignLayer([pool_size,pool_size])([rois,image_meta] + features)
+    # 2 1024 FCs layers
+    #1st layer
+    x = layers.TimeDistributed(layers.Conv2D(fc_layers_size, (pool_size,pool_size), padding="valid"))(x)
+    x = layers.TimeDistributed(BatchNorm())(x, training=train_bn)
+    x = layers.Activation('relu')(x)
+    #2nd layer
+    x = layers.TimeDistributed(layers.Conv2D(fc_layers_size, (1,1), padding="valid"))(x)
+    x = layers.TimeDistributed(BatchNorm())(x, training=train_bn)
+    x = layers.Activation('relu')(x)
+
+    shared = KL.Lambda(lambda x: K.squeeze(K.squeeze(x, 3), 2))(x)
+
+
 
 class RCNN():
     def __init__(self,mode,config):
@@ -126,7 +140,7 @@ class RCNN():
             rois, target_ids, target_bbox = DetectionLayer(config)([ROIS_proposals,input_gt_ids,gt_boxes])
 
             #classification and regression ROIs after RPN through FPN
-            RCNN_class_ids, RCNN_class_probs, RCNN_bbox = fpn_classifier(rois, RCNN_feature, input_image_meta,
+            RCNN_class_probs, RCNN_bbox = fpn_classifier(rois, RCNN_feature, input_image_meta,
                                                                          config.POOL_SIZE,self.NUM_CLASSES,
                                                                          train_bn=config.TRAIN_BN,
                                                                          fc_layers_size=config.FPN_CLS_FC_LAYERS)

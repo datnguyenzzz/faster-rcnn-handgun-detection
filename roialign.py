@@ -7,7 +7,7 @@ import utils
 
 class RoiAlignLayer(layers.Layer):
     def __init__(self,pool_shape,**kwargs):
-        super(ProposalLayer,self).__init__(**kwargs)
+        super(RoiAlignLayer,self).__init__(**kwargs)
         self.pool_shape = tuple(pool_shape)
 
     def call(self,input):

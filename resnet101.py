@@ -1,20 +1,11 @@
 import tensorflow as tf
 from tensorflow.keras import layers
+from utils import BatchNorm
 
 """
 Resnet 101
 filters - the dimensionality of the output space (i.e. the number of output filters in the convolution).
 """
-
-class BatchNorm(layers.BatchNormalization):
-    """
-    Note about training values:
-        None: Train BN layers. This is the normal mode
-        False: Freeze BN layers. Good when batch size is small
-        True: (don't use). Set layer in training mode even when making inferences
-    """
-    def call(self, input, training=None):
-        return super(type(self), self).call(inputs, training = training)
 
 #same dimension 3 layer block
 def normal_block(input, filters, use_bias=True, train_bn = True):
@@ -22,11 +13,11 @@ def normal_block(input, filters, use_bias=True, train_bn = True):
 
     x = layers.Conv2D(filters=filter1, kernel_size=(1,1), use_bias=use_bias)(input)
     x = BatchNorm()(x, training=train_bn)
-    x = layer.Activation('relu')(x)
+    x = layers.Activation('relu')(x)
 
     x = layers.Conv2D(filters=filter2, kernel_size=(3,3), padding='same',use_bias=use_bias)(x)
     x = BatchNorm()(x, training=train_bn)
-    x = layer.Activation('relu')(x)
+    x = layers.Activation('relu')(x)
 
     x = layers.Conv2D(filters=filter3, kernel_size=(1,1), use_bias=use_bias)(x)
     x = BatchNorm()(x, training=train_bn)
@@ -43,11 +34,11 @@ def halved_block(input, filters, strides=(2,2), use_bias=True, train_bn = True):
 
     x = layers.Conv2D(filters=filter1, kernel_size=(1,1), use_bias=use_bias)(input)
     x = BatchNorm()(x, training=train_bn)
-    x = layer.Activation('relu')(x)
+    x = layers.Activation('relu')(x)
 
     x = layers.Conv2D(filters=filter2, kernel_size=(3,3), padding='same', use_bias=use_bias)(x)
     x = BatchNorm()(x, training=train_bn)
-    x = layer.Activation('relu')(x)
+    x = layers.Activation('relu')(x)
 
     x = layers.Conv2D(filters=filter3, kernel_size=(1,1), use_bias=use_bias)(x)
     x = BatchNorm()(x, training=train_bn)

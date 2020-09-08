@@ -1,6 +1,17 @@
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import backend as K
+from tensorflow.keras import layers
+
+class BatchNorm(layers.BatchNormalization):
+    """
+    Note about training values:
+        None: Train BN layers. This is the normal mode
+        False: Freeze BN layers. Good when batch size is small
+        True: (don't use). Set layer in training mode even when making inferences
+    """
+    def call(self, input, training=None):
+        return super(type(self), self).call(inputs, training = training)
 
 def norm_boxes(boxes, shape):
     h,w = tf.split(K.cast(shape, tf.float32),2)
