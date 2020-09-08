@@ -13,9 +13,19 @@ class TrainConfig():
     def __init__(self):
         self.IMAGES_PER_GPU = 2
         self.NUM_CLASSES = 2
-        self.BATCH_SIZE = 100
+        self.BATCH_SIZE = self.IMAGES_PER_GPU
         self.DETECTION_MIN_CONFIDENCE = 0.9
         self.IMAGE_SHAPE = [800,800,3]
+        """
+        all image attributes:
+        image_id size = 1
+        original shape: [h,w,c] size = 3
+        after resize shape: [h,w,c]
+        window: (y1,x1,y2,x2)
+        scale
+        active classes ids
+        """
+        self.IMAGE_META_SIZE = 1 + 3 + 3 + 4 + 1 + self.NUM_CLASSES
 
         #for FPN layer
         self.TRAIN_BN = False
@@ -35,6 +45,12 @@ class TrainConfig():
         self.PRE_NMS_LIMIT = 6000
         self.TRAIN_ROIS_PER_IMAGE = 200
         self.POSITIVE_ROI_RATIO = 0.33
+
+        #ROI Pooling
+        self.POOL_SIZE = 7
+
+        #FCs layer size
+        self.FPN_CLS_FC_LAYERS = 1024
 
 
 class InferenceConfig():

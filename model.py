@@ -11,6 +11,8 @@ import utils
 from proposal import ProposalLayer
 from detection import DetectionLayer
 
+def fpn_classifier()
+
 class RCNN():
     def __init__(self,mode,config):
         self.mode = mode
@@ -37,7 +39,9 @@ class RCNN():
         h,w = config.IMAGE_SHAPE[:2]
         print(h,w)
 
+        #input
         input_image = keras.Input(shape = [None,None,config.IMAGE_SHAPE[2]])
+        imput_image_meta = keras.Input(shape = [config.IMAGE_META_SIZE])
 
         #resnet layer
         C1,C2,C3,C4,C5 = resnet101.build_layers(input = input_image, config=config.TRAIN_BN)
@@ -113,8 +117,16 @@ class RCNN():
         if mode == "training":
             #Subsamples proposals and generates target box refinement, class_ids 1.7
             #ratio postive/negative rois = 1/3 (threshold = 0.5)
+            #target_ids: class ids of gt boxes closest to positive roi
             #target_bbox = offset from positive rois to it's closest gt_box
             rois, target_ids, target_bbox = DetectionLayer(config)([ROIS_proposals,input_gt_ids,gt_boxes])
+
+            #classification and regression ROIs after RPN through FPN
+            RCNN_class_ids, RCNN_class_probs, RCNN_bbox = fpn_classifier(rois, RCNN_feature, input_image_meta,
+                                                                         config.POOL_SIZE,self.NUM_CLASSES,
+                                                                         train_bn=config.TRAIN_BN,
+                                                                         fc_layers_size=config.FPN_CLS_FC_LAYERS)
+
         elif mode =="inference":
             # will do later
             """

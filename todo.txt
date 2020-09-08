@@ -8,5 +8,6 @@ FOR TRAINING
 1.5) RPN nn done
 1.6) anchor boxes + RPN reg result => better boxes + NMS = ROI done
 1.7) Detectionlayer: subsample anchor and class ids. From ROIs list => Positive/negative ROIs
+1.8) After RPN, had ROIs on input image => RoI projection to feature map => .... => cls/rgs
 FOR INFERENCE
 model.py 68 111
