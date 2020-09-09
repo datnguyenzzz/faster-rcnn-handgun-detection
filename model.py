@@ -157,6 +157,7 @@ class RCNN():
 
             #losses
             rpn_class_loss = layers.Lambda(lambda x : losses.rpn_class_loss_func(*x))([input_rpn_match, rpn_class_ids])
+            rpn_bbox_loss = layers.Lambda(lambda x : losses.rpn_bbox_loss_func(config, *x))([input_rpn_bbox, input_rpn_match, rpn_bbox_offset])
 
 
         elif mode =="inference":

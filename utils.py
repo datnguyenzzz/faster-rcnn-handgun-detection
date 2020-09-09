@@ -176,6 +176,15 @@ def parse_image_meta(meta):
 def log2(x):
     return tf.log(x) / tf.log(2.0)
 
+def batch_pack(x, counts, num_rows):
+    """Picks different number of values from each row
+    in x depending on the values in counts.
+    """
+    outputs = []
+    for i in range(num_rows):
+        outputs.append(x[i, :counts[i]])
+    return tf.concat(outputs, axis=0)
+
 
 
 
