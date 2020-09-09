@@ -10,5 +10,7 @@ FOR TRAINING
 1.7) Detectionlayer: subsample anchor and class ids. From ROIs list => Positive/negative ROIs
 1.8) After RPN, had ROIs on input image => RoI projection to feature map => .... => cls/rgs
 1.8.1) ROI pooling + projection = roi align
+....
+1.8.x) loss function
 FOR INFERENCE
 model.py 68 111

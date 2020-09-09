@@ -13,6 +13,7 @@ from utils import BatchNorm
 import resnet101
 import RPN
 import utils
+import losses
 
 def fpn_classifier(rois, features, image_meta, pool_size, num_classes, train_bn=True, fc_layers_size = 1024):
     #ROI pooling + projectation = ROI align
@@ -36,7 +37,7 @@ def fpn_classifier(rois, features, image_meta, pool_size, num_classes, train_bn=
     shape = K.int_shape(rcnn_bbox)
     rcnn_bbox = layers.Reshape((s[1],num_classes,4))(rcnn_bbox) #[batch, num_rois, num_class, (dy,dx,log(dh),log(dw))]
 
-    return rcnn_probs, rcnn_bbox
+    return rcnn_class_ids, rcnn_probs, rcnn_bbox
 
 
 class RCNN():
@@ -80,7 +81,7 @@ class RCNN():
 
         if mode == "train":
             #RPN
-            input_rpn_match = keras.Input(shape = [None,1], dtype=tf.int32) #match?
+            input_rpn_match = keras.Input(shape = [None,1], dtype=tf.int32) #match
             input_rpn_bbox = keras.Input(shape = [None,4], dtype=tf.float32) #bounding box
 
             #ground truth
@@ -128,7 +129,7 @@ class RCNN():
         layer_outputs = [layers.Concatenate(axis=1)(list(o)) for o in layer_outputs]
 
         #rpn_class_cls, rpn_probs, rpn_bbox = layer_outputs
-        rpn_probs, rpn_bbox_offset = layer_outputs
+        rpn_class_ids, rpn_probs, rpn_bbox_offset = layer_outputs
 
 
         #Proposal layer
@@ -148,10 +149,15 @@ class RCNN():
             rois, target_ids, target_bbox = DetectionLayer(config)([ROIS_proposals,input_gt_ids,gt_boxes])
 
             #classification and regression ROIs after RPN through FPN
-            rcnn_class_probs, rcnn_bbox = fpn_classifier(rois, RCNN_feature, input_image_meta,
+            rcnn_class_ids,rcnn_class_probs, rcnn_bbox = fpn_classifier(rois, RCNN_feature, input_image_meta,
                                                                          config.POOL_SIZE,self.NUM_CLASSES,
                                                                          train_bn=config.TRAIN_BN,
                                                                          fc_layers_size=config.FPN_CLS_FC_LAYERS)
+            output_rois = layers.Lambda(lambda x:x * 1)(rois)
+
+            #losses
+            rpn_class_loss = layers.Lambda(lambda x : losses.rpn_class_loss_func(*x))([input_rpn_match, rpn_class_ids])
+
 
         elif mode =="inference":
             # will do later
