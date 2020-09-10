@@ -52,3 +52,21 @@ def rcnn_class_loss_func(target_ids, rcnn_class_ids, total_class_ids):
 
     loss = tf.reduce_sum(loss) / tf.reduce_sum(pred_active)
     return loss
+
+def rcnn_bbox_loss_func(target_bbox, target_ids, rcnn_bbox):
+    #reshape and merge batch and roi_num
+    target_ids = K.reshape(target_ids, (-1,))
+    target_bbox = K.reshape(target_bbox, (-1,4))
+    rcnn_bbox = K.reshape(rcnn_bbox, (-1,K.int_shape(rcnn_bbox)[2],4))
+
+    #only foreground gt contribute to loss.
+    foreground_ix = tf.where(target_ids > 0)[:,0]
+    foreground_ids = tf.cast(tf.gather(target_ids,foreground_ix), tf.int64)
+    index = tf.stack([foreground_ix, foreground_ids], axis=1)
+
+    target_bbox = tf.gather(target_bbox, foregound_ix)
+    rcnn_bbox = tf.gather(rcnn_bbox, index)
+
+    loss = K.switch(tf.size(target_bbox) > 0, l1_loss(target_bbox,rcnn_bbox), tf.constant(0.0))
+    loss = K.mean(loss)
+    return loss
