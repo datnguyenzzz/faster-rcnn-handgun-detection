@@ -165,6 +165,15 @@ class RCNN():
             rcnn_class_loss = layers.Lambda(lambda x : losses.rcnn_class_loss_func(*x))([target_ids, rcnn_class_ids, total_class_ids])
             rcnn_bbox_loss = layers.Lambda(lambda x : losses.rcnn_bbox_loss_func(*x))([target_bbox, target_ids, rcnn_bbox])
 
+            #MODEL
+            inputs = [input_image, input_image_meta, input_rpn_match, input_rpn_bbox, input_gt_ids, input_gt_boxes]
+            outputs = [rpn_class_ids, rpn_probs, rpn_bbox_offset,
+                       rcnn_class_ids,rcnn_class_probs, rcnn_bbox,
+                       ROIS_proposals, output_rois,
+                       rpn_class_loss, rpn_bbox_loss, rcnn_class_loss, rcnn_bbox_loss]
+
+            model = keras.Model(inputs,outputs)
+
         elif mode =="inference":
             # will do later
             """
