@@ -178,3 +178,10 @@ class RCNN():
                                                                          fc_layers_size=config.FPN_CLS_FC_LAYERS)
             #detection
             detections = InferenceDetectionLayer(config)([ROIS_proposals,rcnn_class_probs,rcnn_bbox, input_image_meta])
+
+            inputs = [input_image, input_image_meta, input_anchors]
+            output = [detections,
+                      rcnn_class_probs, rcnn_bbox,
+                      ROIS_proposals,rcnn_class_probs, rcnn_bbox]
+
+            model = keras.Model(inputs,outputs)

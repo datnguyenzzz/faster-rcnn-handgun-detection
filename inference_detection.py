@@ -105,5 +105,8 @@ class InferenceDetectionLayer(layers.Layer):
             lambda x, y, z, w: refine_detections(x, y, z, w, self.config),
             self.config.IMAGES_PER_GPU
         )
+        #[N, (y1, x1, y2, x2, class_id, score)]
+        return tf.reshape(detections, [self.config.BATCH_SIZE, self.config.DETECTION_MAX_INSTANCES, 6])
 
     def compute_output_shape(self, input_shape):
+        return (None, self.config.DETECTION_MAX_INSTANCES, 6)
