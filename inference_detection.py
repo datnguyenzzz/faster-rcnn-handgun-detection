@@ -33,7 +33,7 @@ def refine_detections(rois, probs, offset, window, config):
     pre_nms_rois = tf.gather(refined_rois,   keep)
     unique_pre_nms_class_ids = tf.unique(pre_nms_class_ids)[0]
 
-    def nms_keep(class_id):
+    def nms_keep_map(class_id):
         ixs = tf.where(tf.equal(pre_nms_class_ids, class_ids))[:,0]
 
         class_keep = tf.image.non_max_suppression(
@@ -52,6 +52,24 @@ def refine_detections(rois, probs, offset, window, config):
         # Set shape so map_fn() can infer result shape
         class_keep.set_shape([config.DETECTION_MAX_INSTANCES])
         return class_keep
+
+    nms_keep = tf.map_fn(nms_keep_map, unique_pre_nms_class_ids, dtype=tf.int64)
+
+    nms_keep = tf.reshape(nms_keep,[-1])
+    nms_keep = tf.gather(nms_keep, tf.where(nms_keep > -1)[:,0])
+
+    #intersec between keep and nms_keep
+    keep = tf.sets.set_intersection(tf.expand_dims(keep, 0),
+                                    tf.expand_dims(nms_keep, 0))
+    keep = tf.sparse_tensor_to_dense(keep)[0]
+
+    #keep top scores
+    roi_count = config.DETECTION_MAX_INSTANCES
+    class_scores_keep = tf.gather(class_scores, keep)
+    num_keep = tf.minimum(tf.shape(class_scores_keep)[0], roi_count)
+    top_ids = tf.nn.top_k(class_scores_keep, k = num_keep, sorted=True)[1]
+    keep = tf.gather(keep,top_ids)
+
 
 
 class InferenceDetectionLayer(layers.Layer):
