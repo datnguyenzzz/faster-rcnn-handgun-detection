@@ -170,7 +170,7 @@ def parse_image_meta(meta):
         "image_shape": image_shape,
         "window": window,
         "scale": scale,
-        "class_ids": active_class_ids,
+        "class_ids": class_ids,
     }
 
 def log2(x):

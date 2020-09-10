@@ -68,7 +68,7 @@ class RCNN():
 
         #input
         input_image = keras.Input(shape = [None,None,config.IMAGE_SHAPE[2]])
-        imput_image_meta = keras.Input(shape = [config.IMAGE_META_SIZE])
+        input_image_meta = keras.Input(shape = [config.IMAGE_META_SIZE])
 
         #resnet layer
         C1,C2,C3,C4,C5 = resnet101.build_layers(input = input_image, config=config.TRAIN_BN)
@@ -142,6 +142,9 @@ class RCNN():
 
         #combine together
         if mode == "training":
+            #class ids
+            total_class_ids = layers.Lambda(lambda x : utils.parse_image_meta(x)["class_ids"])(input_image_meta)
+
             #Subsamples proposals and generates target box refinement, class_ids 1.7
             #ratio postive/negative rois = 1/3 (threshold = 0.5)
             #target_ids: class ids of gt boxes closest to positive roi
@@ -155,10 +158,11 @@ class RCNN():
                                                                          fc_layers_size=config.FPN_CLS_FC_LAYERS)
             output_rois = layers.Lambda(lambda x:x * 1)(rois)
 
-            #losses
+            #rpn losses
             rpn_class_loss = layers.Lambda(lambda x : losses.rpn_class_loss_func(*x))([input_rpn_match, rpn_class_ids])
             rpn_bbox_loss = layers.Lambda(lambda x : losses.rpn_bbox_loss_func(config, *x))([input_rpn_bbox, input_rpn_match, rpn_bbox_offset])
-
+            #rcnn losses
+            rcnn_class_loss = layers.Lambda(lambda x : losses.rcnn_class_loss_func(*x))([target_ids, rcnn_class_ids, total_class_ids])
 
         elif mode =="inference":
             # will do later

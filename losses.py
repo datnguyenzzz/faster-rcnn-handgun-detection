@@ -38,3 +38,17 @@ def rpn_bbox_loss_func(config, input_rpn_bbox, input_rpn_match, rpn_bbox_offset)
     loss = l1_loss(input_rpn_bbox, rpn_bbox_offset)
     loss = K.switch(tf.size(loss) > 0, K.mean(loss), tf.constant(0.0))
     return loss
+
+
+def rcnn_class_loss_func(target_ids, rcnn_class_ids, total_class_ids):
+    target_ids = tf.cast(target_ids, 'int64')
+
+    #predictions of classes which are not in dataset (only objects not background)
+    pred_class_ids = tf.argmax(rcnn_class_ids, axis=2)
+    pred_class = tf.gather(total_class_ids[0], pred_class_id)
+
+    loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=target_ids, logits=rcnn_class_ids)
+    loss = loss * pred_active
+
+    loss = tf.reduce_sum(loss) / tf.reduce_sum(pred_active)
+    return loss
