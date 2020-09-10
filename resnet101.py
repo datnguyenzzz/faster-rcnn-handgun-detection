@@ -102,6 +102,6 @@ def build_FPN(C1,C2,C3,C4,C5,config):
     P4 = layers.Conv2D(filters=config.PIRAMID_SIZE, kernel_size=(3,3), padding="SAME")(P4)
     P5 = layers.Conv2D(filters=config.PIRAMID_SIZE, kernel_size=(3,3), padding="SAME")(P5)
     #P6 for anchor scale in RPN
-    P6 = layers.MaxPooling2D(pool_size=(1,1), strides=2)(p5)
+    P6 = layers.MaxPooling2D(pool_size=(1,1), strides=2)(P5)
 
     return [P2,P3,P4,P5,P6]

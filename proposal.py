@@ -1,6 +1,7 @@
 import tensorflow as tf
 from tensorflow.keras import layers
 from tensorflow.keras import backend as K
+import numpy as np
 
 import utils
 
@@ -38,9 +39,7 @@ class ProposalLayer(layers.Layer):
         #generate proposal by NMS
 
         def nms(boxes,scores):
-            ids = tf.image.non_max_suppression(boxes = boxes, scores = scores,
-                                               max_output_size_per_class = num_proposal,
-                                               iou_threshold = nms_threshold)
+            ids = tf.image.non_max_suppression(boxes, scores, self.num_proposal,self.nms_threshold)
             proposals = tf.gather(boxes,ids)
             padding = tf.maximum(self.num_proposal - tf.shape(proposals)[0], 0)
             proposals = tf.pad(proposals, [(0, padding), (0, 0)])

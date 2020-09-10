@@ -11,7 +11,7 @@ class BatchNorm(layers.BatchNormalization):
         True: (don't use). Set layer in training mode even when making inferences
     """
     def call(self, input, training=None):
-        return super(type(self), self).call(inputs, training = training)
+        return super(type(self), self).call(input, training = training)
 
 def norm_boxes(boxes, shape):
     h,w = tf.split(K.cast(shape, tf.float32),2)
@@ -59,7 +59,7 @@ def batch_slice(input, func, batch_size):
 
     output = []
     for i in range(batch_size):
-        input_slice = [x[i] for x in inputs]
+        input_slice = [x[i] for x in input]
         output_slice = func(*input_slice)
         if not isinstance(output_slice, (tuple,list)):
             output_slice = [output_slice]

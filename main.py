@@ -2,7 +2,9 @@ import os
 import json
 import skimage.draw
 import argparse
-import model
+import numpy as np
+
+from model import RCNN
 
 ROOT_DIR = os.path.abspath("../database")
 ANNOTATIONS = os.path.join(ROOT_DIR, "annotations")
@@ -122,7 +124,7 @@ class GunDataset():
 
 
 ################################################################################
-#main
+#main python main.py train/inference
 ################################################################################
 
 parser = argparse.ArgumentParser()
@@ -133,7 +135,10 @@ args = parser.parse_args()
 
 if args.command == "train":
     config = TrainConfig()
-    model = model.RCNN(mode = "train", config = config)
+    model = RCNN(mode = "train", config = config)
 else:
     config = InferenceConfig()
-    model = model.RCNN(mode = "inference", config = config)
+    model = RCNN(mode = "inference", config = config)
+#load resnet101 pretrained model
+weight_path = COCO_WEIGHTS
+print(weight_path)

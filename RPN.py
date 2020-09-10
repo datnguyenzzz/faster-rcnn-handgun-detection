@@ -2,7 +2,7 @@ import tensorflow as tf
 from tensorflow.keras import layers
 
 def build_graph(input_feature, anchor_per_window, anchor_stride):
-    shared = layers.Conv2D(filters=512, kernel_size=(3,3), padding="same", activation="relu")
+    shared = layers.Conv2D(filters=512, kernel_size=(3,3), padding="same", activation="relu", strides=anchor_stride)(input_feature)
 
     #cls
     x = layers.Conv2D(filters=2*anchor_per_window, kernel_size=(1,1), padding="valid", activation="linear")(shared)

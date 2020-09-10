@@ -72,7 +72,7 @@ class RCNN():
         input_image_meta = keras.Input(shape = [config.IMAGE_META_SIZE])
 
         #resnet layer
-        C1,C2,C3,C4,C5 = resnet101.build_layers(input = input_image, config=config.TRAIN_BN)
+        C1,C2,C3,C4,C5 = resnet101.build_layers(input = input_image, train_bn=config.TRAIN_BN)
         #FPN
         P2,P3,P4,P5,P6 = resnet101.build_FPN(C1=C1,C2=C2,C3=C3,C4=C4,C5=C5,config=config)
 
@@ -94,8 +94,8 @@ class RCNN():
 
             #anchors for RPN
             anchors = self.get_anchors(config.IMAGE_SHAPE)
-
-            anchors = layers.Lambda(lambda x : tf.Variable(anchors))(input_image)
+            anchors = np.broadcast_to(anchors, (config.BATCH_SIZE,) + anchors.shape)
+            #anchors = layers.Lambda(lambda x : tf.Variable(anchors))(input_image)
 
         elif mode == "inference":
             input_anchors = KL.Input(shape=[None, 4])
@@ -130,6 +130,7 @@ class RCNN():
 
 
         #Proposal layer
+        num_proposal=0
         if mode == "training":
             num_proposal = config.NUM_ROI_TRAINING
         elif mode == "inference":
