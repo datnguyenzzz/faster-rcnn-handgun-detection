@@ -102,7 +102,8 @@ class RCNN():
             will do later
             ###################################
             """
-            x=1+1
+            input_anchors = KL.Input(shape=[None, 4])
+            anchors = input_anchors
 
         #RPN Keras model
         input_feature = keras.Input(shape=[None,None,config.PIRAMID_SIZE])
