@@ -13,4 +13,5 @@ FOR TRAINING
 ....
 1.8.x) loss function
 FOR INFERENCE
+ROI_proposal after RPN is almost perfect. RCNN_bbox is offset make them better
 model.py 68 111

@@ -6,7 +6,8 @@ import numpy as np
 import math
 #######Layers###########
 from proposal import ProposalLayer
-from detection import DetectionLayer
+from training_detection import TrainingDetectionLayer
+from inference_detection import InferenceDetectionLayer
 from roialign import RoiAlignLayer
 from utils import BatchNorm
 #######customize########
@@ -97,11 +98,6 @@ class RCNN():
             anchors = layers.Lambda(lambda x : tf.Variable(anchors))(input_image)
 
         elif mode == "inference":
-            """
-            ###################################
-            will do later
-            ###################################
-            """
             input_anchors = KL.Input(shape=[None, 4])
             anchors = input_anchors
 
@@ -150,7 +146,7 @@ class RCNN():
             #ratio postive/negative rois = 1/3 (threshold = 0.5)
             #target_ids: class ids of gt boxes closest to positive roi
             #target_bbox = offset from positive rois to it's closest gt_box
-            rois, target_ids, target_bbox = DetectionLayer(config)([ROIS_proposals,input_gt_ids,gt_boxes])
+            rois, target_ids, target_bbox = TrainingDetectionLayer(config)([ROIS_proposals,input_gt_ids,gt_boxes])
 
             #classification and regression ROIs after RPN through FPN
             rcnn_class_ids,rcnn_class_probs, rcnn_bbox = fpn_classifier(rois, RCNN_feature, input_image_meta,
@@ -176,10 +172,9 @@ class RCNN():
             model = keras.Model(inputs,outputs)
 
         elif mode =="inference":
-            # will do later
-            """
-            ####################################################
-            will do later
-            ####################################################
-            """
-            x=1+1
+            rcnn_class_ids,rcnn_class_probs, rcnn_bbox = fpn_classifier(ROIS_proposals, RCNN_feature, input_image_meta,
+                                                                         config.POOL_SIZE,self.NUM_CLASSES,
+                                                                         train_bn=config.TRAIN_BN,
+                                                                         fc_layers_size=config.FPN_CLS_FC_LAYERS)
+            #detection
+            detections = InferenceDetectionLayer(config)([ROIS_proposals,rcnn_class_probs,rcnn_bbox, input_image_meta])

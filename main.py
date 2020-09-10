@@ -55,10 +55,46 @@ class TrainConfig():
 
 class InferenceConfig():
     def __init__(self):
-        self.GPU_NUM = 1
         self.IMAGES_PER_GPU = 1
+        self.NUM_CLASSES = 2
+        self.BATCH_SIZE = self.IMAGES_PER_GPU
+        self.DETECTION_MIN_CONFIDENCE = 0.9
+        self.IMAGE_SHAPE = [800,800,3]
+        """
+        all image attributes:
+        image_id size = 1
+        original shape: [h,w,c] size = 3
+        after resize shape: [h,w,c]
+        window: (y1,x1,y2,x2)
+        scale
+        active classes ids
+        """
+        self.IMAGE_META_SIZE = 1 + 3 + 3 + 4 + 1 + self.NUM_CLASSES
 
+        #for FPN layer
         self.TRAIN_BN = False
+        self.PIRAMID_SIZE = 256
+        self.BACKBONE_STRIDES = [4,8,16,32,64] #C2,C3,C4,C5,C6
+
+        #for anchors
+        self.ANCHOR_SCALES = [32,64,128,256,512]
+        self.ANCHOR_RATIOS = [0.5,1,2]
+        self.ANCHOR_STRIDE = 1
+
+        #for ROI
+        self.NUM_ROI_TRAINING = 2000
+        self.NUM_ROI_INFERENCE = 1000
+        self.NMS_THRESHOLD = 0.7 #Non-Max suppression for choosing ROI
+        self.BBOX_STD_DEV = np.array([0.1,0.1,0.2,0.2]) #standard deviation
+        self.PRE_NMS_LIMIT = 6000
+        self.TRAIN_ROIS_PER_IMAGE = 200
+        self.POSITIVE_ROI_RATIO = 0.33
+
+        #ROI Pooling
+        self.POOL_SIZE = 7
+
+        #FCs layer size
+        self.FPN_CLS_FC_LAYERS = 1024
 
 class GunDataset():
     def __init__(self):

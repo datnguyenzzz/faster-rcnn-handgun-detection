@@ -70,9 +70,9 @@ def detection_graph(rois,gt_ids,gt_boxes,config):
 
     return rois, rois_gt_ids, bbox_offset
 
-class DetectionLayer(layers.Layer):
+class TrainingDetectionLayer(layers.Layer):
     def __init__(self,config,**kwargs):
-        super(DetectionLayer,self).__init__(**kwargs)
+        super(TrainingDetectionLayer,self).__init__(**kwargs)
         self.config = config
 
     def call(self,input):
