@@ -70,6 +70,16 @@ def refine_detections(rois, probs, offset, window, config):
     top_ids = tf.nn.top_k(class_scores_keep, k = num_keep, sorted=True)[1]
     keep = tf.gather(keep,top_ids)
 
+    detections = tf.concat([
+        tf.gather(refined_rois, keep),
+        tf.to_float(tf.gather(class_ids, keep))[..., tf.newaxis],
+        tf.gather(class_scores,keep)[..., tf.newaxis]
+    ], axis=1)
+
+    gap = config.DETECTION_MAX_INSTANCES - tf.shape(detections)[0]
+    detections = tf.pad(detections, [(0, gap), (0, 0)], "CONSTANT")
+    return detections
+
 
 
 class InferenceDetectionLayer(layers.Layer):
