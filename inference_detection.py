@@ -27,6 +27,31 @@ def refine_detections(rois, probs, offset, window, config):
                                     tf.expand_dims(conf_keep, 0))
     keep = tf.sparse_tensor_to_dense(keep)[0]
 
+    #apply per class NMS
+    pre_nms_class_ids = tf.gather(class_ids, keep)
+    pre_nms_scores = tf.gather(class_scores, keep)
+    pre_nms_rois = tf.gather(refined_rois,   keep)
+    unique_pre_nms_class_ids = tf.unique(pre_nms_class_ids)[0]
+
+    def nms_keep(class_id):
+        ixs = tf.where(tf.equal(pre_nms_class_ids, class_ids))[:,0]
+
+        class_keep = tf.image.non_max_suppression(
+            tf.gather(pre_nms_rois,ixs),
+            tf.gather(pre_nms_scores,ixs),
+            max_output_size=config.DETECTION_MAX_INSTANCES,
+            iou_threshold=config.DETECTION_NMS_THRESHOLD
+        )
+
+        # Map indices
+        class_keep = tf.gather(keep, tf.gather(ixs, class_keep))
+        # Pad with -1 so returned tensors have the same shape
+        gap = config.DETECTION_MAX_INSTANCES - tf.shape(class_keep)[0]
+        class_keep = tf.pad(class_keep, [(0, gap)],
+                            mode='CONSTANT', constant_values=-1)
+        # Set shape so map_fn() can infer result shape
+        class_keep.set_shape([config.DETECTION_MAX_INSTANCES])
+        return class_keep
 
 
 class InferenceDetectionLayer(layers.Layer):
