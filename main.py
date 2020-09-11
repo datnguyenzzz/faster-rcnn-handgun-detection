@@ -15,6 +15,9 @@ COCO_WEIGHTS = os.path.join(ROOT_DIR,"pretrained\\mask_rcnn.h5")
 
 class TrainConfig():
     def __init__(self):
+
+        self.NAME = "gun"
+
         self.IMAGES_PER_GPU = 2
         self.NUM_CLASSES = 2
         self.BATCH_SIZE = self.IMAGES_PER_GPU
@@ -59,6 +62,9 @@ class TrainConfig():
 
 class InferenceConfig():
     def __init__(self):
+
+        self.NAME = "gun"
+
         self.IMAGES_PER_GPU = 1
         self.NUM_CLASSES = 2
         self.BATCH_SIZE = self.IMAGES_PER_GPU
@@ -126,11 +132,12 @@ class GunDataset():
 
 
 ################################################################################
-#main python main.py train/inference
+#main python main.py train/inference --weights=coco
 ################################################################################
 
 parser = argparse.ArgumentParser()
 parser.add_argument("command")
+parser.add_argument("--weights", required = True)
 parser.add_argument("--image", required = False)
 parser.add_argument("--video", required = False)
 args = parser.parse_args()
@@ -142,7 +149,10 @@ else:
     config = InferenceConfig()
     model = RCNN(mode = "inference", config = config)
 #load resnet101 pretrained model
-weight_path = COCO_WEIGHTS
-print(weight_path)
+if args.weights == "coco":
+    weight_path = COCO_WEIGHTS
+    print(weight_path)
+elif args.weights == "last":
+    weight_path = model.find_last()
 
 model.load_weights(weight_path, by_name=True)
