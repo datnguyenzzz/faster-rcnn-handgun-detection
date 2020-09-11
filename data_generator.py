@@ -2,8 +2,7 @@ import tensorflow as tf
 import numpy as np
 
 def data_generator(dataset, config, shuffle=True, augment=False, augmentation=None,
-                   random_rois=0, batch_size=1, detection_targets=False,
-                   no_augmentation_sources=None):
+                   random_rois=0, batch_size=1, detection_targets=False):
     """
     shuffle: shuffle image every epoch
     return:
@@ -22,9 +21,24 @@ def data_generator(dataset, config, shuffle=True, augment=False, augmentation=No
                                      backbone_shape,
                                      self.config.BACKBONE_STRIDES)
 
+    image_ids = np.copy(dataset.image_ids)
+    error_count = 0
+
+    index=-1
+
     while True:
         try:
-            pass
+            index = (index+1) % len(image_ids)
+
+            if shuffle and index==0:
+                np.random.shuffle(image_ids)
+
+            image_id = image_ids[index]
+
+            input_image, input_image_meta, input_gt_class_ids, input_gt_boxes = load_image_gt(dataset, config, image_id,
+                                                                                              augment=augment, augmentation=None)
+
+
         except (GeneratorExit, KeyboardInterrupt):
             raise
         except:

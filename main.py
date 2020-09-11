@@ -86,6 +86,8 @@ class InferenceConfig():
 
 class GunDataset():
     def __init__(self):
+        self.num_images = 0
+        self.image_ids = []
         self.image_attribuites = []
 
     def add_image(self,dict):
@@ -130,12 +132,18 @@ class GunDataset():
                 "rects" : rects
             })
 
+    def prepare(self):
+        self.num_images = len(self.image_attribuites)
+        self.image_ids = np.arange(self.num_images)
+
 def train(model):
     dataset_train = GunDataset()
     dataset_train.load_attributes("train")
+    dataset_train.prepare()
 
     dataset_val = GunDataset()
     dataset_val.load_attributes("val")
+    dataset_val.prepare()
 
     LEARNING_RATE = 0.001
     model.train(dataset_train, dataset_val, learning_rate=LEARNING_RATE, epochs = 30)
