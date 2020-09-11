@@ -131,9 +131,14 @@ class GunDataset():
             })
 
 def train(model):
-    dataset = GunDataset()
-    dataset.load_attributes("train")
-    print(dataset.image_attribuites)
+    dataset_train = GunDataset()
+    dataset_train.load_attributes("train")
+
+    dataset_val = GunDataset()
+    dataset_val.load_attributes("val")
+
+    LEARNING_RATE = 0.001
+    model.train(dataset_train, dataset_val, learning_rate=LEARNING_RATE, epochs = 30)
 
 
 ################################################################################

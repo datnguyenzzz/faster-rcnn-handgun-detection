@@ -15,6 +15,7 @@ import resnet101
 import RPN
 import utils
 import losses
+import data_generator
 
 def fpn_classifier(rois, features, image_meta, pool_size, num_classes, train_bn=True, fc_layers_size = 1024):
     #ROI pooling + projectation = ROI align
@@ -196,7 +197,7 @@ class RCNN():
         return model
 
     def load_weights(self, path, by_name):
-        
+
         model = self.rcnn_model
         model.load_weights(path, by_name=by_name)
         print("done load pretrained coco model weights")
@@ -225,3 +226,17 @@ class RCNN():
                 errno.ENOENT, "Could not find weight files in {}".format(dir_name))
         checkpoint = os.path.join(dir_name, checkpoints[-1])
         return checkpoint
+
+    def train(self, dataset_train, dataset_val, learning_rate, epochs,
+              augmentation=None, custom_callbacks=None, no_augmentation_sources=None):
+        print("START TRAINING!")
+
+        #for l in self.rcnn_model.layers:
+        #    print(l.name)
+
+        train_generator = data_generator(dataset_train, self.config, shuffle=True,
+                                         augmentation=augmentation,
+                                         batch_size=self.config.BATCH_SIZE,
+                                         no_augmentation_sources=no_augmentation_sources)
+        val_generator = data_generator(dataset_val, self.config, shuffle=True,
+                                       batch_size=self.config.BATCH_SIZE)
