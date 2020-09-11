@@ -198,6 +198,6 @@ class RCNN():
     def load_weights(self, path, by_name):
         import h5py
 
-        f = h5py.File(path, mode = 'r')
-        for key in f.keys():
-            print(f[key])
+        model = self.rcnn_model
+        model.load_weights(path, by_name=by_name)
+        print("done load pretrain weight")
