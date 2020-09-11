@@ -130,9 +130,14 @@ class GunDataset():
                 "rects" : rects
             })
 
+def train(model):
+    dataset = GunDataset()
+    dataset.load_attributes("train")
+    print(dataset.image_attribuites)
+
 
 ################################################################################
-#main python main.py train/inference --weights=coco
+#command: main python main.py train/inference --weights=coco/last
 ################################################################################
 
 parser = argparse.ArgumentParser()
@@ -156,3 +161,6 @@ elif args.weights == "last":
     weight_path = model.find_last()
 
 model.load_weights(weight_path, by_name=True)
+
+if args.command == "train":
+    train(model)
