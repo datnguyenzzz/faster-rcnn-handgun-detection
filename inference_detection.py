@@ -11,7 +11,7 @@ def refine_detections(rois, probs, offset, window, config):
     offset: [N, num_classes, (dy, dx, log(dh), log(dw))]
     """
     class_ids = tf.argmax(probs, axis=1, output_type=tf.int32) #find class of each ROI
-    index = tf.stack([tf.range(probs.shape[0]), class_ids],axis=1)
+    index = tf.stack([tf.range(tf.shape(probs)[0]), class_ids],axis=1)
     class_scores = tf.gather_nd(probs, index)
     offset_specific = tf.gather_nd(offset, index)
 

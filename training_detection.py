@@ -33,13 +33,13 @@ def detection_graph(rois,gt_ids,gt_boxes,config):
     #subsample ROI. Aim for ratio positive/negative = 1/3
     positive_num = int(config.TRAIN_ROIS_PER_IMAGE * config.POSITIVE_ROI_RATIO)
     #positives
-    positive_ids = tf.random_shuffle(positive_ids)[:positive_num]
+    positive_ids = tf.random.shuffle(positive_ids)[:positive_num]
     positive_num = tf.shape(positive_ids)[0]
     #negatives
     #num+ = r+ * all -> all = num+ / r+ num- = (1-r+)*all -> num- = (1-r+) * num+/r+ = 1/r+ * num+ - num+
     negative_ratio = 1.0 / config.POSITIVE_ROI_RATIO
     negative_num = tf.cast(negative_ratio * tf.cast(positive_num, tf.float32), tf.int32) - positive_num
-    negative_ids = tf.random_shuffle(negative_ids)[:negative_num]
+    negative_ids = tf.random.shuffle(negative_ids)[:negative_num]
 
     positive_rois = tf.gather(rois, positive_ids)
     negative_rois = tf.gather(rois, negative_ids)
@@ -63,12 +63,12 @@ def detection_graph(rois,gt_ids,gt_boxes,config):
     N = tf.shape(negative_rois)[0]
     P = tf.maximum(config.TRAIN_ROIS_PER_IMAGE - tf.shape(rois)[0],0)
 
-    rois = tf.pad(rois, tf.constant([[0, P], [0,0]]))
-    roi_gt_boxes = tf.pad(roi_gt_boxes, tf.constant([[0, N+P], [0,0]]))
-    roi_gt_ids = tf.pad(roi_gt_ids, tf.constant([0, N+P]))
-    bbox_offset = tf.pad(bbox_offset, tf.constant([[0, N+P], [0,0]]))
+    rois = tf.pad(rois, [(0, P), (0, 0)])
+    roi_gt_boxes = tf.pad(roi_gt_boxes, [(0, N+P), (0, 0)])
+    roi_gt_ids = tf.pad(roi_gt_ids, [(0, N+P)])
+    bbox_offset = tf.pad(bbox_offset, [(0, N+P), (0, 0)])
 
-    return rois, rois_gt_ids, bbox_offset
+    return rois, roi_gt_ids, bbox_offset
 
 class TrainingDetectionLayer(layers.Layer):
     def __init__(self,config,**kwargs):

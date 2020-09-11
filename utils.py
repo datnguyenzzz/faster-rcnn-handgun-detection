@@ -151,8 +151,8 @@ def compute_bbox_offset(rois,gt_boxes):
 
     dy = (gt_center_y - center_y) / h
     dx = (gt_center_x - center_x) / w
-    dh = tf.log(gt_h / h)
-    dw = tf.log(gt_w / w)
+    dh = tf.math.log(gt_h / h)
+    dw = tf.math.log(gt_w / w)
 
     res = tf.stack([dy,dx,dh,dw], axis = 1)
     return res
@@ -166,7 +166,7 @@ def parse_image_meta(meta):
     class_ids = meta[:,12:]
     return {
         "image_id": image_id,
-        "original_image_shape": original_image_shape,
+        "original_shape": original_shape,
         "image_shape": image_shape,
         "window": window,
         "scale": scale,
@@ -174,7 +174,7 @@ def parse_image_meta(meta):
     }
 
 def log2(x):
-    return tf.log(x) / tf.log(2.0)
+    return tf.math.log(x) / tf.math.log(2.0)
 
 def batch_pack(x, counts, num_rows):
     """Picks different number of values from each row

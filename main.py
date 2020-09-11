@@ -9,7 +9,8 @@ from model import RCNN
 ROOT_DIR = os.path.abspath("../database")
 ANNOTATIONS = os.path.join(ROOT_DIR, "annotations")
 IMAGES = os.path.join(ROOT_DIR,"images")
-COCO_WEIGHTS = os.path.join(ROOT_DIR,"pretrained\\resnet101_weights_th.h5")
+#COCO_WEIGHTS = os.path.join(ROOT_DIR,"pretrained\\resnet101_weights_th.h5")
+COCO_WEIGHTS = os.path.join(ROOT_DIR,"pretrained\\resnet101_rcnn.h5")
 
 class TrainConfig():
     def __init__(self):
@@ -142,3 +143,5 @@ else:
 #load resnet101 pretrained model
 weight_path = COCO_WEIGHTS
 print(weight_path)
+
+model.load_weights(weight_path, by_name=True, exclude=[])

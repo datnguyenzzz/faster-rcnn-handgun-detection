@@ -2,6 +2,8 @@ import tensorflow as tf
 from tensorflow.keras import layers
 from tensorflow.keras import backend as K
 
+import utils
+
 def l1_loss(y_true, y_pred):
     diff = K.abs(y_true - y_pred)
     less_than_one = K.cast(K.less(diff, 1.0), "float32")
@@ -15,7 +17,7 @@ def rpn_class_loss_func(input_rpn_match, rpn_class_ids):
     """
     input_rpn_match = tf.squeeze(input_rpn_match, -1)
     #-1/1 => 0/1
-    anchor_class = K.cast(k.equal(input_rpn_match, 1), tf.int32)
+    anchor_class = K.cast(K.equal(input_rpn_match, 1), tf.int32)
 
     id_non_neutral = tf.where(K.not_equal(input_rpn_match,0))
     rpn_class_ids = tf.gather_nd(rpn_class_ids, id_non_neutral)
@@ -45,12 +47,12 @@ def rcnn_class_loss_func(target_ids, rcnn_class_ids, total_class_ids):
 
     #predictions of classes which are not in dataset (only objects not background)
     pred_class_ids = tf.argmax(rcnn_class_ids, axis=2)
-    pred_class = tf.gather(total_class_ids[0], pred_class_id)
+    pred_class = tf.gather(total_class_ids[0], pred_class_ids)
 
     loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=target_ids, logits=rcnn_class_ids)
-    loss = loss * pred_active
+    loss = loss * pred_class
 
-    loss = tf.reduce_sum(loss) / tf.reduce_sum(pred_active)
+    loss = tf.reduce_sum(loss) / tf.reduce_sum(pred_class)
     return loss
 
 def rcnn_bbox_loss_func(target_bbox, target_ids, rcnn_bbox):
@@ -64,7 +66,7 @@ def rcnn_bbox_loss_func(target_bbox, target_ids, rcnn_bbox):
     foreground_ids = tf.cast(tf.gather(target_ids,foreground_ix), tf.int64)
     index = tf.stack([foreground_ix, foreground_ids], axis=1)
 
-    target_bbox = tf.gather(target_bbox, foregound_ix)
+    target_bbox = tf.gather(target_bbox, foreground_ix)
     rcnn_bbox = tf.gather(rcnn_bbox, index)
 
     loss = K.switch(tf.size(target_bbox) > 0, l1_loss(target_bbox,rcnn_bbox), tf.constant(0.0))

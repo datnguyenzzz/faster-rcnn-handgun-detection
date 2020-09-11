@@ -36,7 +36,11 @@ def fpn_classifier(rois, features, image_meta, pool_size, num_classes, train_bn=
 
     rcnn_bbox = layers.TimeDistributed(layers.Dense(num_classes * 4, activation='linear'))(shared)
     shape = K.int_shape(rcnn_bbox)
-    rcnn_bbox = layers.Reshape((s[1],num_classes,4))(rcnn_bbox) #[batch, num_rois, num_class, (dy,dx,log(dh),log(dw))]
+    if shape[1]==None:
+        rcnn_bbox = layers.Reshape((-1, num_classes, 4))(rcnn_bbox)
+    else:
+        rcnn_bbox = layers.Reshape((shape[1], num_classes, 4))(rcnn_bbox)
+    #rcnn_bbox = layers.Reshape((shape[1],num_classes,4))(rcnn_bbox) #[batch, num_rois, num_class, (dy,dx,log(dh),log(dw))]
 
     return rcnn_class_ids, rcnn_probs, rcnn_bbox
 
@@ -46,7 +50,7 @@ class RCNN():
         self.mode = mode
         self.config = config #config hyperparameter
         self.anchor_cache = {} #dict
-        self.model = self.build(mode=mode, config=config)
+        self.rcnn_model = self.build(mode=mode, config=config)
 
     def get_anchors(self,image_shape):
 
@@ -65,7 +69,7 @@ class RCNN():
 
     def build(self,mode,config):
         h,w = config.IMAGE_SHAPE[:2]
-        print(h,w)
+        model = None
 
         #input
         input_image = keras.Input(shape = [None,None,config.IMAGE_SHAPE[2]])
@@ -131,7 +135,7 @@ class RCNN():
 
         #Proposal layer
         num_proposal=0
-        if mode == "training":
+        if mode == "train":
             num_proposal = config.NUM_ROI_TRAINING
         elif mode == "inference":
             num_proposal = config.NUM_ROI_INFERENCE
@@ -139,7 +143,7 @@ class RCNN():
         ROIS_proposals = ProposalLayer(num_proposal=num_proposal, nms_threshold=config.NMS_THRESHOLD, config=config)([rpn_probs,rpn_bbox_offset,anchors])
 
         #combine together
-        if mode == "training":
+        if mode == "train":
             #class ids
             total_class_ids = layers.Lambda(lambda x : utils.parse_image_meta(x)["class_ids"])(input_image_meta)
 
@@ -151,7 +155,7 @@ class RCNN():
 
             #classification and regression ROIs after RPN through FPN
             rcnn_class_ids,rcnn_class_probs, rcnn_bbox = fpn_classifier(rois, RCNN_feature, input_image_meta,
-                                                                         config.POOL_SIZE,self.NUM_CLASSES,
+                                                                         config.POOL_SIZE,config.NUM_CLASSES,
                                                                          train_bn=config.TRAIN_BN,
                                                                          fc_layers_size=config.FPN_CLS_FC_LAYERS)
             output_rois = layers.Lambda(lambda x:x * 1)(rois)
@@ -186,3 +190,13 @@ class RCNN():
                       ROIS_proposals,rcnn_class_probs, rcnn_bbox]
 
             model = keras.Model(inputs,outputs)
+
+        #print(model.get_layer())
+        return model
+
+    def load_weights(self, path, by_name=False, exclude=None):
+        import h5py
+
+        f = h5py.File(path, mode = 'r')
+        for key in f.keys():
+            print(key)
