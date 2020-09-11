@@ -200,3 +200,6 @@ class RCNN():
         f = h5py.File(path, mode = 'r')
         for key in f.keys():
             print(key)
+
+        for key in f.keys():
+            print(f[key])
