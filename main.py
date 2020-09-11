@@ -1,6 +1,7 @@
 import os
 import json
-import skimage.draw
+import skimage.io
+import skimage.color
 import argparse
 import numpy as np
 
@@ -132,18 +133,25 @@ class GunDataset():
                 "rects" : rects
             })
 
-    def prepare(self):
-        self.num_images = len(self.image_attribuites)
-        self.image_ids = np.arange(self.num_images)
+    def load_image(self, image_id):
+        image = skimage.io.imread(self.image_attribuites[image_id]['path'])
+
+        if image.ndim != 3:
+            image = skimage.color.gray2rgb(image)
+
+        if image.shape[-1] == 4:
+            image = image[..., :3]
+        return image
+
 
 def train(model):
     dataset_train = GunDataset()
     dataset_train.load_attributes("train")
-    dataset_train.prepare()
+
 
     dataset_val = GunDataset()
     dataset_val.load_attributes("val")
-    dataset_val.prepare()
+
 
     LEARNING_RATE = 0.001
     model.train(dataset_train, dataset_val, learning_rate=LEARNING_RATE, epochs = 30)

@@ -227,16 +227,11 @@ class RCNN():
         checkpoint = os.path.join(dir_name, checkpoints[-1])
         return checkpoint
 
-    def train(self, dataset_train, dataset_val, learning_rate, epochs,
-              augmentation=None, custom_callbacks=None, no_augmentation_sources=None):
+    def train(self, dataset_train, dataset_val, learning_rate, epochs):
         print("START TRAINING!")
 
         #for l in self.rcnn_model.layers:
         #    print(l.name)
 
-        train_generator = data_generator(dataset_train, self.config, shuffle=True,
-                                         augmentation=augmentation,
-                                         batch_size=self.config.BATCH_SIZE,
-                                         no_augmentation_sources=no_augmentation_sources)
-        val_generator = data_generator(dataset_val, self.config, shuffle=True,
-                                       batch_size=self.config.BATCH_SIZE)
+        train_generator = data_generator.gen(dataset_train, self.config, shuffle=True, batch_size=self.config.BATCH_SIZE)
+        val_generator = data_generator.gen(dataset_val, self.config, shuffle=True, batch_size=self.config.BATCH_SIZE)
