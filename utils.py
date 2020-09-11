@@ -53,7 +53,7 @@ def generate_anchors(scales,ratios,anchor_stride,feature_shapes,feature_strides)
 
     return np.concatenate(anchors, axis=0)
 
-def batch_slice(input, func, batch_size):
+def batch_slice(input, func, batch_size, names=None):
     if not isinstance(input,list):
         input = [input]
 
@@ -67,7 +67,10 @@ def batch_slice(input, func, batch_size):
 
     output = list(zip(*output))
 
-    res = [tf.stack(o, axis=0) for o in output]
+    if names is None:
+        names = [None] * len(output)
+
+    res = [tf.stack(o, axis=0, name=n) for o,n in zip(output,names)]
     if len(res)==1:
         res = res[0]
     return res

@@ -21,20 +21,20 @@ def fpn_classifier(rois, features, image_meta, pool_size, num_classes, train_bn=
     x = RoiAlignLayer([pool_size,pool_size])([rois,image_meta] + features)
     # 2 1024 FCs layers
     #1st layer
-    x = layers.TimeDistributed(layers.Conv2D(fc_layers_size, (pool_size,pool_size), padding="valid"))(x)
-    x = layers.TimeDistributed(BatchNorm())(x, training=train_bn)
+    x = layers.TimeDistributed(layers.Conv2D(fc_layers_size, (pool_size,pool_size), padding="valid"), name="mrcnn_class_conv1")(x)
+    x = layers.TimeDistributed(BatchNorm(), name='mrcnn_class_bn1')(x, training=train_bn)
     x = layers.Activation('relu')(x)
     #2nd layer
-    x = layers.TimeDistributed(layers.Conv2D(fc_layers_size, (1,1), padding="valid"))(x)
-    x = layers.TimeDistributed(BatchNorm())(x, training=train_bn)
+    x = layers.TimeDistributed(layers.Conv2D(fc_layers_size, (1,1), padding="valid", name="mrcnn_class_conv2"))(x)
+    x = layers.TimeDistributed(BatchNorm(), name='mrcnn_class_bn2')(x, training=train_bn)
     x = layers.Activation('relu')(x)
 
     shared = layers.Lambda(lambda x: K.squeeze(K.squeeze(x, 3), 2))(x) #h=w=1 no need that information
 
-    rcnn_class_ids = layers.TimeDistributed(layers.Dense(num_classes))(shared)
-    rcnn_probs = layers.TimeDistributed(layers.Activation('softmax'))(rcnn_class_ids)
+    rcnn_class_ids = layers.TimeDistributed(layers.Dense(num_classes),name='mrcnn_class_logits')(shared)
+    rcnn_probs = layers.TimeDistributed(layers.Activation('softmax'),name="mrcnn_class")(rcnn_class_ids)
 
-    rcnn_bbox = layers.TimeDistributed(layers.Dense(num_classes * 4, activation='linear'))(shared)
+    rcnn_bbox = layers.TimeDistributed(layers.Dense(num_classes * 4, activation='linear'),name='mrcnn_bbox_fc')(shared)
     shape = K.int_shape(rcnn_bbox)
     if shape[1]==None:
         rcnn_bbox = layers.Reshape((-1, num_classes, 4))(rcnn_bbox)
@@ -72,8 +72,8 @@ class RCNN():
         model = None
 
         #input
-        input_image = keras.Input(shape = [None,None,config.IMAGE_SHAPE[2]])
-        input_image_meta = keras.Input(shape = [config.IMAGE_META_SIZE])
+        input_image = keras.Input(shape = [None,None,config.IMAGE_SHAPE[2]], name = "input_image")
+        input_image_meta = keras.Input(shape = [config.IMAGE_META_SIZE], name = "input_image_meta")
 
         #resnet layer
         C1,C2,C3,C4,C5 = resnet101.build_layers(input = input_image, train_bn=config.TRAIN_BN)
@@ -86,12 +86,12 @@ class RCNN():
 
         if mode == "train":
             #RPN
-            input_rpn_match = keras.Input(shape = [None,1], dtype=tf.int32) #match
-            input_rpn_bbox = keras.Input(shape = [None,4], dtype=tf.float32) #bounding box
+            input_rpn_match = keras.Input(shape = [None,1],name="input_rpn_match", dtype=tf.int32) #match
+            input_rpn_bbox = keras.Input(shape = [None,4], name="input_rpn_bbox", dtype=tf.float32) #bounding box
 
             #ground truth
-            input_gt_ids = keras.Input(shape = [None], dtype=tf.int32) #GT class IDs
-            input_gt_boxes = keras.Input(shape = [None,4], dtype=tf.float32)
+            input_gt_ids = keras.Input(shape = [None],name="input_gt_class_ids", dtype=tf.int32) #GT class IDs
+            input_gt_boxes = keras.Input(shape = [None,4],name="input_gt_boxes", dtype=tf.float32)
 
             #normalize ground truth boxes
             gt_boxes = layers.Lambda(lambda x : utils.norm_boxes(x,K.shape(input_image)[1:3]))(input_gt_boxes)
@@ -102,7 +102,7 @@ class RCNN():
             #anchors = layers.Lambda(lambda x : tf.Variable(anchors))(input_image)
 
         elif mode == "inference":
-            input_anchors = KL.Input(shape=[None, 4])
+            input_anchors = KL.Input(shape=[None, 4], name="input_anchors")
             anchors = input_anchors
 
         #RPN Keras model
@@ -115,7 +115,7 @@ class RCNN():
         """
         outputs = RPN.build_graph(input_feature,len(config.ANCHOR_RATIOS),config.ANCHOR_STRIDE)
 
-        RPN_model = keras.Model(inputs=[input_feature], outputs = outputs)
+        RPN_model = keras.Model(inputs=[input_feature], outputs = outputs, name="rpn_model")
 
         """
         In FPN, we generate a pyramid of feature maps. We apply the RPN (described in the previous section)
@@ -126,8 +126,9 @@ class RCNN():
         for x in RPN_feature:
             layer_outputs.append(RPN_model([x]))
 
+        output_names = ["rpn_class_logits", "rpn_class", "rpn_bbox"]
         layer_outputs = list(zip(*layer_outputs))
-        layer_outputs = [layers.Concatenate(axis=1)(list(o)) for o in layer_outputs]
+        layer_outputs = [layers.Concatenate(axis=1, name = n)(list(o)) for o,n in zip(layer_outputs, output_names)]
 
         #rpn_class_cls, rpn_probs, rpn_bbox = layer_outputs
         rpn_class_ids, rpn_probs, rpn_bbox_offset = layer_outputs
@@ -161,11 +162,11 @@ class RCNN():
             output_rois = layers.Lambda(lambda x:x * 1)(rois)
 
             #rpn losses
-            rpn_class_loss = layers.Lambda(lambda x : losses.rpn_class_loss_func(*x))([input_rpn_match, rpn_class_ids])
-            rpn_bbox_loss = layers.Lambda(lambda x : losses.rpn_bbox_loss_func(config, *x))([input_rpn_bbox, input_rpn_match, rpn_bbox_offset])
+            rpn_class_loss = layers.Lambda(lambda x : losses.rpn_class_loss_func(*x), name="rpn_class_loss")([input_rpn_match, rpn_class_ids])
+            rpn_bbox_loss = layers.Lambda(lambda x : losses.rpn_bbox_loss_func(config, *x), name="rpn_bbox_loss")([input_rpn_bbox, input_rpn_match, rpn_bbox_offset])
             #rcnn losses
-            rcnn_class_loss = layers.Lambda(lambda x : losses.rcnn_class_loss_func(*x))([target_ids, rcnn_class_ids, total_class_ids])
-            rcnn_bbox_loss = layers.Lambda(lambda x : losses.rcnn_bbox_loss_func(*x))([target_bbox, target_ids, rcnn_bbox])
+            rcnn_class_loss = layers.Lambda(lambda x : losses.rcnn_class_loss_func(*x), name="mrcnn_class_loss")([target_ids, rcnn_class_ids, total_class_ids])
+            rcnn_bbox_loss = layers.Lambda(lambda x : losses.rcnn_bbox_loss_func(*x), name="mrcnn_bbox_loss")([target_bbox, target_ids, rcnn_bbox])
 
             #MODEL
             inputs = [input_image, input_image_meta, input_rpn_match, input_rpn_bbox, input_gt_ids, input_gt_boxes]
@@ -174,7 +175,7 @@ class RCNN():
                        ROIS_proposals, output_rois,
                        rpn_class_loss, rpn_bbox_loss, rcnn_class_loss, rcnn_bbox_loss]
 
-            model = keras.Model(inputs,outputs)
+            model = keras.Model(inputs,outputs,name='mask_rcnn')
 
         elif mode =="inference":
             rcnn_class_ids,rcnn_class_probs, rcnn_bbox = fpn_classifier(ROIS_proposals, RCNN_feature, input_image_meta,
@@ -189,17 +190,14 @@ class RCNN():
                       rcnn_class_probs, rcnn_bbox,
                       ROIS_proposals,rcnn_class_probs, rcnn_bbox]
 
-            model = keras.Model(inputs,outputs)
+            model = keras.Model(inputs,outputs,name='mask_rcnn')
 
-        #print(model.get_layer())
+        #print(model.layers)
         return model
 
-    def load_weights(self, path, by_name=False, exclude=None):
+    def load_weights(self, path, by_name):
         import h5py
 
         f = h5py.File(path, mode = 'r')
-        for key in f.keys():
-            print(key)
-
         for key in f.keys():
             print(f[key])

@@ -80,7 +80,9 @@ class TrainingDetectionLayer(layers.Layer):
         gt_ids = input[1]
         gt_boxes = input[2]
 
-        output = utils.batch_slice([rois,gt_ids,gt_boxes], lambda x,y,z : detection_graph(x,y,z,self.config), self.config.IMAGES_PER_GPU)
+        names = ["rois", "target_class_ids", "target_bbox"]
+        output = utils.batch_slice([rois,gt_ids,gt_boxes], lambda x,y,z : detection_graph(x,y,z,self.config),
+                                   self.config.IMAGES_PER_GPU, names=names)
 
         return output
 

@@ -22,24 +22,28 @@ class ProposalLayer(layers.Layer):
         anchors = input[2] #normalize already
 
         pre_nms_limit = K.minimum(self.config.PRE_NMS_LIMIT, tf.shape(anchors)[1])
-        ids = tf.math.top_k(input=class_probs, k=pre_nms_limit, sorted=True).indices #find k largest probabilities
+        ids = tf.math.top_k(input=class_probs, k=pre_nms_limit, sorted=True, name="top_anchors").indices #find k largest probabilities
 
         #slice to each batch ( images per process)
         class_probs = utils.batch_slice([class_probs, ids], lambda x,y:tf.gather(params=x, indices=y), self.config.IMAGES_PER_GPU)
         bbox_offset = utils.batch_slice([bbox_offset, ids], lambda x,y:tf.gather(params=x, indices=y), self.config.IMAGES_PER_GPU)
-        anchors = utils.batch_slice([anchors, ids], lambda x,y:tf.gather(params=x, indices=y), self.config.IMAGES_PER_GPU)
+        anchors = utils.batch_slice([anchors, ids], lambda x,y:tf.gather(params=x, indices=y),
+                                    self.config.IMAGES_PER_GPU, names=["pre_nms_anchors"])
 
         #apply bbox to anchor boxes to get better bounding box closer to the closed Foreground object.
-        bboxes = utils.batch_slice([anchors,bbox_offset], lambda x,y : utils.apply_bbox_offset(anchors=x,bbox_offset=y), self.config.IMAGES_PER_GPU)
+        bboxes = utils.batch_slice([anchors,bbox_offset], lambda x,y : utils.apply_bbox_offset(anchors=x,bbox_offset=y),
+                                   self.config.IMAGES_PER_GPU, names=["refined_anchors"])
 
         #clip to 0..1 range
         window = np.array([0,0,1,1],dtype=np.float32)
-        bboxes = utils.batch_slice(bboxes, lambda x: utils.clip_boxes(x,window), self.config.IMAGES_PER_GPU)
+        bboxes = utils.batch_slice(bboxes, lambda x: utils.clip_boxes(x,window),
+                                   self.config.IMAGES_PER_GPU, names=["refined_anchors_clipped"])
 
         #generate proposal by NMS
 
         def nms(boxes,scores):
-            ids = tf.image.non_max_suppression(boxes, scores, self.num_proposal,self.nms_threshold)
+            ids = tf.image.non_max_suppression(boxes, scores, self.num_proposal,
+                                               self.nms_threshold, name="rpn_non_max_suppression")
             proposals = tf.gather(boxes,ids)
             padding = tf.maximum(self.num_proposal - tf.shape(proposals)[0], 0)
             proposals = tf.pad(proposals, [(0, padding), (0, 0)])
