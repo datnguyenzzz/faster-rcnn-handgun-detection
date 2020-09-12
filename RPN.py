@@ -42,4 +42,55 @@ def build_targets(image_shape, anchors, gt_class_ids, gt_boxes, config):
     else:
         no_crowd_bool = np.ones([anchors.shape[0]], dtype=bool)
 
-    
+    overlap = utils.IoU_overlap(anchors, gt_boxes)
+
+    anchors_iou_max_id = np.argmax(overlap, axis=1)
+    anchors_iou_max = overlap[np.arange(overlap.shape[0]),anchors_iou_max_id] #max iou with each anchor
+
+    rpn_match[(overlaps_iou_max < 0.3) & (no_crowd_bool)] = -1
+
+    gt_iou_max_id = np.argwhere(overlap == np.max(overlap, axis=0))[:,0]
+    rpn_match[gt_iou_max_id] = 1
+    rpn_match[anchors_iou_max >= 0.7] = 1
+
+    #balance + and - anchors
+    ids = np.where(rpn_match == 1)[0]
+    extra = len(ids) - (config.RPN_TRAIN_ANCHORS_PER_IMAGE // 2)
+    if extra > 0:
+        ids = np.random.choice(ids, extra, replace=False)
+        rpn_match[ids]=0
+
+    ids = np.where(rpn_match == -1)[0]
+    extra = len(ids) - (config.RPN_TRAIN_ANCHORS_PER_IMAGE - np.sum(rpn_match==1))
+    if extra > 0:
+        ids = np.random.choice(ids, extra, replace=False)
+        rpn_match[ids]=0
+
+    #for + anchor, compute offset
+    ids = np.where(rpn_match == 1)[0]
+    ix = 0
+
+    for i,a in zip(ids, anchors[ids]):
+        gt = gt_boxes[anchors_iou_max_id[i]]
+
+        gt_h = gt[2] - gt[0]
+        gt_w = gt[3] - gt[1]
+        gt_center_y = gt[0] + 0.5 * gt_h
+        gt_center_x = gt[1] + 0.5 * gt_w
+
+        a_h = a[2] - a[0]
+        a_w = a[3] - a[1]
+        gt_center_y = a[0] + 0.5 * a_h
+        gt_center_x = a[1] + 0.5 * a_w
+
+        rpn_bbox[ix] = [
+            (gt_center_y - a_center_y) / a_h,
+            (gt_center_x - a_center_x) / a_w,
+            np.log(gt_h / a_h),
+            np.log(gt_w / a_w)
+        ]
+
+        rpn_bbox[ix] /= config.BBOX_STD_DEV
+        ix+=1
+
+    return rpn_match, rpn_bbox
