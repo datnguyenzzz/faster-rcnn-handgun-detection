@@ -3,6 +3,8 @@ import numpy as np
 import math
 import json
 
+import RPN
+
 import utils
 
 def compose_image_meta(image_id, original_image_shape, image_shape, window, scale, active_class_ids):
@@ -54,9 +56,6 @@ def gen(dataset, config, shuffle=True, random_rois=0, batch_size=1, detection_ta
     - input_gt_class_ids
     - input_gt_boxes
     """
-
-
-
     backbone_shape = np.array([[int(math.ceil(config.IMAGE_SHAPE[0]/stride)),int(math.ceil(config.IMAGE_SHAPE[1]/stride))] for stride in config.BACKBONE_STRIDES])
     anchors = utils.generate_anchors(config.ANCHOR_SCALES,
                                      config.ANCHOR_RATIOS,
@@ -69,8 +68,7 @@ def gen(dataset, config, shuffle=True, random_rois=0, batch_size=1, detection_ta
     error_count = 0
 
     index=-1
-    load_image_gt(dataset, config, image_ids[0])
-    """
+
     while True:
         try:
             index = (index+1) % len(image_ids)
@@ -82,6 +80,12 @@ def gen(dataset, config, shuffle=True, random_rois=0, batch_size=1, detection_ta
 
             input_image, input_image_meta, input_gt_class_ids, input_gt_boxes = load_image_gt(dataset, config, image_id)
 
+            if not np.any(input_gt_class_ids > 0):
+                continue
+
+            #RPN targets
+            rpn_match, rpn_bbox = RPN.build_targets(input_image.shape, anchors, input_gt_class_ids, input_gt_boxes, config)
+
 
         except (GeneratorExit, KeyboardInterrupt):
             raise
@@ -91,5 +95,5 @@ def gen(dataset, config, shuffle=True, random_rois=0, batch_size=1, detection_ta
             error_count += 1
             if error_count > 5:
                 raise
-    """
+
     return None

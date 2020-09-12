@@ -44,6 +44,7 @@ class TrainConfig():
         self.ANCHOR_SCALES = [32,64,128,256,512]
         self.ANCHOR_RATIOS = [0.5,1,2]
         self.ANCHOR_STRIDE = 1
+        self.RPN_TRAIN_ANCHORS_PER_IMAGE = 256
 
         #for ROI
         self.NUM_ROI_TRAINING = 2000
