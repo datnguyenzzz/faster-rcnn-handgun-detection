@@ -54,12 +54,16 @@ class TrainConfig():
         self.PRE_NMS_LIMIT = 6000
         self.TRAIN_ROIS_PER_IMAGE = 200
         self.POSITIVE_ROI_RATIO = 0.33
+        self.MAX_GT_INSTANCES = 100
 
         #ROI Pooling
         self.POOL_SIZE = 7
 
         #FCs layer size
         self.FPN_CLS_FC_LAYERS = 1024
+
+        #image RGB mean
+        self.MEAN_PIXEL = np.array([123.7, 116.8, 103.9])
 
 
 class InferenceConfig():

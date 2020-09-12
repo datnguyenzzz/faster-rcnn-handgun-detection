@@ -45,7 +45,14 @@ def load_image_gt(dataset, config, image_id):
 
     return image, image_meta, class_ids, gt_boxes
 
-def gen(dataset, config, shuffle=True, random_rois=0, batch_size=1, detection_targets=False):
+def mold_image(images, config):
+    """Expects an RGB image (or array of images) and subtracts
+    the mean pixel and converts it to float. Expects image
+    colors in RGB order.
+    """
+    return images.astype(np.float32) - config.MEAN_PIXEL
+
+def gen(dataset, config, shuffle=True, batch_size=1):
     """
     shuffle: shuffle image every epoch
     return:
@@ -63,6 +70,7 @@ def gen(dataset, config, shuffle=True, random_rois=0, batch_size=1, detection_ta
                                      backbone_shape,
                                      config.BACKBONE_STRIDES)
 
+    b = 0 #batch index
     num_images = len(dataset.image_attribuites)
     image_ids = np.arange(num_images)
     error_count = 0
@@ -86,6 +94,39 @@ def gen(dataset, config, shuffle=True, random_rois=0, batch_size=1, detection_ta
             #RPN targets
             rpn_match, rpn_bbox = RPN.build_targets(input_image.shape, anchors, input_gt_class_ids, input_gt_boxes, config)
 
+
+            if b==0 :
+                #initial
+                batch_image = np.zeros((batch_size, ) + input_image.shape, dtype = np.float32)
+                batch_image_meta = np.zeros((batch_size, ) + input_image_meta.shape, dtype = input_image_meta.dtype)
+                batch_gt_class_ids = np.zeros((batch_size, config.MAX_GT_INSTANCES), dtype = np.int32)
+                batch_gt_boxes = np.zeros((batch_size, config.MAX_GT_INSTANCES, 4), dtype = np.int32)
+                batch_rpn_match = np.zeros([batch_size, anchors.shape[0], 1], dtype = rpn_match.dtype)
+                batch_rpn_bbox = np.zeros([batch_size, config.RPN_TRAIN_ANCHORS_PER_IMAGE, 4], dtype = rpn_bbox.dtype)
+
+                if input_gt_boxes.shape[0] > config.MAX_GT_INSTANCES:
+                    ids = np.random.choice(np.arange(input_gt_boxes.shape[0]),
+                                           config.MAX_GT_INSTANCES, replace=False)
+                    input_gt_class_ids = input_gt_class_ids[ids]
+                    input_gt_boxes = input_gt_boxes[ids]
+
+            batch_image[b] = mold_image(input_image.astype(np.float32), config)
+            batch_image_meta[b] = input_image_meta
+            batch_gt_class_ids[b, :input_gt_class_ids.shape[0]] = input_gt_class_ids
+            batch_gt_boxes[b, :input_gt_boxes.shape[0]] = input_gt_boxes
+            batch_rpn_match[b] = rpn_match[:, np.newaxis]
+            batch_rpn_bbox[b] = rpn_bbox
+
+            b+=1
+
+            if b>=batch_size:
+                inputs = [batch_image, batch_image_meta, batch_rpn_match, batch_gt_boxes,
+                          batch_gt_class_ids,batch_gt_boxes]
+                outputs = []
+
+                yield inputs, outputs
+
+                b=0
 
         except (GeneratorExit, KeyboardInterrupt):
             raise

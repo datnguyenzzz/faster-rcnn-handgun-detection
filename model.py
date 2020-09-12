@@ -235,3 +235,5 @@ class RCNN():
 
         train_generator = data_generator.gen(dataset_train, self.config, shuffle=True, batch_size=self.config.BATCH_SIZE)
         val_generator = data_generator.gen(dataset_val, self.config, shuffle=True, batch_size=self.config.BATCH_SIZE)
+
+        
