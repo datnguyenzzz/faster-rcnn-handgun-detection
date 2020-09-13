@@ -271,7 +271,7 @@ class RCNN():
         """
         trainable_weights is the list of those that are meant to be updated
          (via gradient descent) to minimize the loss during training.
-         non_trainable_weights is the list of those that aren't meant to be trained. 
+         non_trainable_weights is the list of those that aren't meant to be trained.
          Typically they are updated by the model during the forward pass.
         """
 
@@ -298,6 +298,44 @@ class RCNN():
             #print trainable layers
             if trainable and verbose > 0:
                 print("{}{:20}   ({})".format(" " * indent, layer.name,layer.__class__.__name__))
+
+    def compile(self,learning_rate, momentum):
+        optimizer = keras.optimizers.SGD(lr=learning_rate, momentum=momentum,clipnorm=self.config.GRADIENT_CLIP_NORM)
+
+        self.rcnn_model._losses = []
+        self.rcnn_model._per_input_losses = []
+
+        loss_func_name = ["rpn_class_loss","rpn_bbox_loss","mrcnn_class_loss","mrcnn_bbox_loss"]
+
+        for name in loss_func_name:
+            layer = self.rcnn_model.get_layer(name)
+
+            if layer.output in self.rcnn_model.losses:
+                continue
+
+            loss = (tf.reduce_mean(layer.output, keepdims=True) * self.config.LOSS_WEIGHTS.get(name,1.))
+            self.keras_model.add_loss(loss)
+
+        #l2 Regularization
+        reg_losses = [
+            keras.regularizers.L2(self.config.WEIGHT_DECAY)(w) / tf.cast(tf.size(w), tf.float32)
+            for w in self.rcnn_model.trainable_weights
+            if 'gamma' not in w.name and 'beta' not in w.name
+        ]
+
+        self.keras_model.add_loss(tf.add_n(reg_losses))
+
+        self.rcnn_model.compile(optimizer=optimizer, loss=[None] * len(self.rcnn_model.outputs))
+
+        for name in loss_func_name:
+            if name in self.rcnn_model.metrics_names:
+                continue
+
+            layer = self.rcnn_model.get_layer(name)
+            self.rcnn_model.metrics_names.append(name)
+
+            loss = (tf.reduce_mean(layer.output, keepdims = True) * self.config.LOSS_WEIGHTS.get(name,1.))
+            self.rcnn_model.metrics_tensors.append(loss)
 
 
     def train(self, dataset_train, dataset_val, learning_rate, epochs):
@@ -338,3 +376,4 @@ class RCNN():
         #since already load pretrained model, so we don't need train backbone
         layers = r"(mrcnn\_.*)|(rpn\_.*)|(fpn\_.*)"
         self.set_trainable(layers)
+        self.compile(learning_rate, self.config.LEARNING_MOMENTUM)

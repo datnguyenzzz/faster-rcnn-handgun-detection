@@ -65,6 +65,18 @@ class TrainConfig():
         #image RGB mean
         self.MEAN_PIXEL = np.array([123.7, 116.8, 103.9])
 
+        #learning
+        self.LEARNING_RATE = 0.001
+        self.LEARNING_MOMENTUM = 0.9
+        self.GRADIENT_CLIP_NORM = 5.0
+        self.LOSS_WEIGHTS = {
+            "rpn_class_loss": 1.,
+            "rpn_bbox_loss": 1.,
+            "mrcnn_class_loss": 1.,
+            "mrcnn_bbox_loss": 1.,
+        }
+        self.WEIGHT_DECAY = 0.0001
+
 
 class InferenceConfig():
     def __init__(self):
