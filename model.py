@@ -5,6 +5,8 @@ from tensorflow.keras import backend as K
 import numpy as np
 import math
 import datetime
+import os
+import re
 #######Layers###########
 from proposal import ProposalLayer
 from training_detection import TrainingDetectionLayer
@@ -27,7 +29,7 @@ def fpn_classifier(rois, features, image_meta, pool_size, num_classes, train_bn=
     x = layers.TimeDistributed(BatchNorm(), name='mrcnn_class_bn1')(x, training=train_bn)
     x = layers.Activation('relu')(x)
     #2nd layer
-    x = layers.TimeDistributed(layers.Conv2D(fc_layers_size, (1,1), padding="valid", name="mrcnn_class_conv2"))(x)
+    x = layers.TimeDistributed(layers.Conv2D(fc_layers_size, (1,1), padding="valid"), name="mrcnn_class_conv2")(x)
     x = layers.TimeDistributed(BatchNorm(), name='mrcnn_class_bn2')(x, training=train_bn)
     x = layers.Activation('relu')(x)
 
@@ -60,9 +62,9 @@ class RCNN():
         self.epoch = 0
         now = datetime.datetime.now()
 
-        if model_path:
-            regex = r".*[/\\][\w-]+(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})[/\\]mask\_rcnn\_[\w-]+(\d{4})\.h5"
-            m = re.match(regex, model_path)
+        if path:
+            regex = r".*[/\\][\w-]+(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})[/\\]rcnn\_[\w-]+(\d{4})\.h5"
+            m = re.match(regex, path)
             if m:
                 now = datetime.datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)),
                                         int(m.group(4)), int(m.group(5)))
@@ -225,6 +227,14 @@ class RCNN():
         return model
 
     def load_weights(self, path, by_name):
+        """
+        import h5py
+
+        f = h5py.File(path, "r")
+        for k in f.keys():
+            print(k)
+            print(f[k])
+        """
 
         model = self.rcnn_model
         model.load_weights(path, by_name=by_name)
@@ -266,6 +276,9 @@ class RCNN():
         train_generator = data_generator.gen(dataset_train, self.config, shuffle=True, batch_size=self.config.BATCH_SIZE)
         val_generator = data_generator.gen(dataset_val, self.config, shuffle=True, batch_size=self.config.BATCH_SIZE)
 
+        if not os.path.exists(self.log_dir):
+            os.makedirs(self.log_dir)
+
         callbacks = [
             keras.callbacks.TensorBoard(log_dir = self.log_dir,histogram_freq=0, write_graph=True, write_images=False),
             keras.callbacks.ModelCheckpoint(self.checkpoint_path, verbose=0, save_weights_only=True)
@@ -273,3 +286,18 @@ class RCNN():
 
         print("\nStarting at epoch {}. LR={}\n".format(self.epoch, learning_rate))
         print("Checkpoint Path: {}".format(self.checkpoint_path))
+
+        """
+        print(self.log_dir)
+        print(self.checkpoint_path)
+
+        f = open("D:\My_Code\gun_detection\\todo.txt","w")
+
+        for l in self.rcnn_model.layers:
+            f.write("\n fuck "+l.name+"\n")
+            f.write(str(l.get_weights()))
+
+        f.close()
+        """
+        #set layers trainable
+        #self.set_trainable()

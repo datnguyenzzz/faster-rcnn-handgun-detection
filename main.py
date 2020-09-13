@@ -164,6 +164,7 @@ def train(model):
 
 ################################################################################
 #command: main python main.py train/inference --weights=coco/last
+#tensorboard --logdir=log_dir
 ################################################################################
 
 parser = argparse.ArgumentParser()
