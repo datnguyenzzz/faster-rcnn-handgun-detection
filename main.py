@@ -76,6 +76,8 @@ class TrainConfig():
             "mrcnn_bbox_loss": 1.,
         }
         self.WEIGHT_DECAY = 0.0001
+        self.STEPS_PER_EPOCH = 1000
+        self.VALIDATION_STEPS = 50
 
 
 class InferenceConfig():
