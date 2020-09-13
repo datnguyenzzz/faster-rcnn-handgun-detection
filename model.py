@@ -4,6 +4,7 @@ from tensorflow.keras import layers
 from tensorflow.keras import backend as K
 import numpy as np
 import math
+import datetime
 #######Layers###########
 from proposal import ProposalLayer
 from training_detection import TrainingDetectionLayer
@@ -51,7 +52,31 @@ class RCNN():
         self.mode = mode
         self.config = config #config hyperparameter
         self.anchor_cache = {} #dict
+        self.set_log_dir()
         self.rcnn_model = self.build(mode=mode, config=config)
+
+    def set_log_dir(self, path=None):
+        self.epoch = 0
+        now = datetime.datetime.now()
+
+        if model_path:
+            regex = r".*[/\\][\w-]+(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})[/\\]mask\_rcnn\_[\w-]+(\d{4})\.h5"
+            m = re.match(regex, model_path)
+            if m:
+                now = datetime.datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)),
+                                        int(m.group(4)), int(m.group(5)))
+                self.epoch = int(m.group(6)) - 1 + 1
+                print('Re-starting from epoch %d' % self.epoch)
+
+        # Directory for training logs
+        self.log_dir = os.path.join(self.model_dir, "{}{:%Y%m%dT%H%M}".format(
+            self.config.NAME.lower(), now))
+
+        # Path to save after each epoch. Include placeholders that get filled by Keras.
+        self.checkpoint_path = os.path.join(self.log_dir, "rcnn_{}_*epoch*.h5".format(
+            self.config.NAME.lower()))
+        self.checkpoint_path = self.checkpoint_path.replace(
+            "*epoch*", "{epoch:04d}")
 
     def get_anchors(self,image_shape):
 
@@ -202,6 +227,8 @@ class RCNN():
         model.load_weights(path, by_name=by_name)
         print("done load pretrained coco model weights")
 
+        self.set_log_dir(path)
+
     def find_last(self):
 
         # Get directory names. Each directory corresponds to a model
@@ -236,4 +263,6 @@ class RCNN():
         train_generator = data_generator.gen(dataset_train, self.config, shuffle=True, batch_size=self.config.BATCH_SIZE)
         val_generator = data_generator.gen(dataset_val, self.config, shuffle=True, batch_size=self.config.BATCH_SIZE)
 
-        
+        callbacks = [
+            keras.callbacks.TensorBoard(log_dir = self.log_dir,histogram_freq=0, write_graph=True, write_images=False)
+        ]
