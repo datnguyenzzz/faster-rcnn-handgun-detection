@@ -12,7 +12,7 @@ ANNOTATIONS = os.path.join(ROOT_DIR, "annotations")
 IMAGES = os.path.join(ROOT_DIR,"images")
 #COCO_WEIGHTS = os.path.join(ROOT_DIR,"pretrained\\resnet101_weights_th.h5")
 #COCO_WEIGHTS = os.path.join(ROOT_DIR,"pretrained\\resnet101_rcnn.h5")
-COCO_WEIGHTS = os.path.join(ROOT_DIR,"pretrained\\mask_rcnn.h5")
+COCO_WEIGHTS = os.path.join(ROOT_DIR,"model\\mask_rcnn.h5")
 
 class TrainConfig():
     def __init__(self):

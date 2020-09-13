@@ -52,6 +52,7 @@ class RCNN():
         self.mode = mode
         self.config = config #config hyperparameter
         self.anchor_cache = {} #dict
+        self.model_dir = "D:\My_Code\database\model"
         self.set_log_dir()
         self.rcnn_model = self.build(mode=mode, config=config)
 
@@ -73,10 +74,12 @@ class RCNN():
             self.config.NAME.lower(), now))
 
         # Path to save after each epoch. Include placeholders that get filled by Keras.
-        self.checkpoint_path = os.path.join(self.log_dir, "rcnn_{}_*epoch*.h5".format(
+        self.checkpoint_path = os.path.join(self.log_dir, "rcnn_{}_*epoch*_*val_loss*.h5".format(
             self.config.NAME.lower()))
         self.checkpoint_path = self.checkpoint_path.replace(
             "*epoch*", "{epoch:04d}")
+        self.checkpoint_path = self.checkpoint_path.replace(
+            "*val_loss*", "{val_loss:.2f}")
 
     def get_anchors(self,image_shape):
 
@@ -264,5 +267,9 @@ class RCNN():
         val_generator = data_generator.gen(dataset_val, self.config, shuffle=True, batch_size=self.config.BATCH_SIZE)
 
         callbacks = [
-            keras.callbacks.TensorBoard(log_dir = self.log_dir,histogram_freq=0, write_graph=True, write_images=False)
+            keras.callbacks.TensorBoard(log_dir = self.log_dir,histogram_freq=0, write_graph=True, write_images=False),
+            keras.callbacks.ModelCheckpoint(self.checkpoint_path, verbose=0, save_weights_only=True)
         ]
+
+        print("\nStarting at epoch {}. LR={}\n".format(self.epoch, learning_rate))
+        print("Checkpoint Path: {}".format(self.checkpoint_path))
