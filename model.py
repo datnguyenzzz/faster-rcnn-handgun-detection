@@ -267,6 +267,39 @@ class RCNN():
         checkpoint = os.path.join(dir_name, checkpoints[-1])
         return checkpoint
 
+    def set_trainable(self,layers_regex, model=None, indent=0, verbose=1):
+        """
+        trainable_weights is the list of those that are meant to be updated
+         (via gradient descent) to minimize the loss during training.
+         non_trainable_weights is the list of those that aren't meant to be trained. 
+         Typically they are updated by the model during the forward pass.
+        """
+
+        model = model or self.rcnn_model
+        layers = model.layers
+
+        for layer in layers:
+            #print(layer.name,layer.__class__.__name__)
+            if layer.__class__.__name__ == "Model":
+                #print("in model: ",layer.name)
+                self.set_trainable(layers_regex, model = layer, indent = indent+4)
+                continue
+
+            if not layer.weights:
+                continue
+
+            trainable = bool(re.fullmatch(layers_regex, layer.name))
+
+            if layer.__class__.__name__ == 'TimeDistributed':
+                layer.layer.trainable = trainable
+            else:
+                layer.trainable = trainable
+
+            #print trainable layers
+            if trainable and verbose > 0:
+                print("{}{:20}   ({})".format(" " * indent, layer.name,layer.__class__.__name__))
+
+
     def train(self, dataset_train, dataset_val, learning_rate, epochs):
         print("START TRAINING!")
 
@@ -301,3 +334,7 @@ class RCNN():
         """
         #set layers trainable
         #self.set_trainable()
+
+        #since already load pretrained model, so we don't need train backbone
+        layers = r"(mrcnn\_.*)|(rpn\_.*)|(fpn\_.*)"
+        self.set_trainable(layers)
