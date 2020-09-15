@@ -19,11 +19,12 @@ class TrainConfig():
 
         self.NAME = "gun"
 
-        self.IMAGES_PER_GPU = 2
+        self.IMAGES_PER_GPU = 1
         self.NUM_CLASSES = 2
         self.BATCH_SIZE = self.IMAGES_PER_GPU
         self.DETECTION_MIN_CONFIDENCE = 0.9
-        self.IMAGE_SHAPE = [800,800,3]
+        self.IMAGE_SHAPE = np.array([832, 832,3])
+
         """
         all image attributes:
         image_id size = 1
@@ -69,12 +70,6 @@ class TrainConfig():
         self.LEARNING_RATE = 0.001
         self.LEARNING_MOMENTUM = 0.9
         self.GRADIENT_CLIP_NORM = 5.0
-        self.LOSS_WEIGHTS = {
-            "rpn_class_loss": 1.,
-            "rpn_bbox_loss": 1.,
-            "mrcnn_class_loss": 1.,
-            "mrcnn_bbox_loss": 1.,
-        }
         self.WEIGHT_DECAY = 0.0001
         self.STEPS_PER_EPOCH = 1000
         self.VALIDATION_STEPS = 50
@@ -89,7 +84,7 @@ class InferenceConfig():
         self.NUM_CLASSES = 2
         self.BATCH_SIZE = self.IMAGES_PER_GPU
         self.DETECTION_MIN_CONFIDENCE = 0.9
-        self.IMAGE_SHAPE = [800,800,3]
+        self.IMAGE_SHAPE = np.array([832, 832,3])
         """
         all image attributes:
         image_id size = 1
@@ -162,6 +157,9 @@ class GunDataset():
             image = image[..., :3]
         return image
 
+    def load_bbox(self, image_id):
+        image_attr = self.image_attribuites[image_ids]
+
 
 def train(model):
     dataset_train = GunDataset()
@@ -172,6 +170,7 @@ def train(model):
     dataset_val.load_attributes("val")
 
 
+    #LEARNING_RATE = 0.001
     LEARNING_RATE = 0.001
     model.train(dataset_train, dataset_val, learning_rate=LEARNING_RATE, epochs = 30)
 

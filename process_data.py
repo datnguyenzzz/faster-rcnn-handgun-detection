@@ -10,5 +10,5 @@ for i in range(1,21):
     print(link)
     img = Image.open(link)
 
-    img = img.resize((800,800), Image.ANTIALIAS)
+    img = img.resize((832,832), Image.ANTIALIAS)
     img.save(link)

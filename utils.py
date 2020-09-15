@@ -13,11 +13,19 @@ class BatchNorm(layers.BatchNormalization):
     def call(self, input, training=None):
         return super(type(self), self).call(input, training = training)
 
-def norm_boxes(boxes, shape):
-    h,w = tf.split(K.cast(shape, tf.float32),2)
-    scale = K.concatenate((h,w,h,w), axis=-1) - K.constant(1.0)
-    shift = K.constant([0.,0.,1.,1.])
+def norm_boxes_np(boxes, shape):
+    h, w = shape
+    scale = np.array([h - 1, w - 1, h - 1, w - 1])
+    shift = np.array([0, 0, 1, 1])
+    return np.divide((boxes - shift), scale).astype(np.float32)
+
+def norm_boxes_tf(boxes, shape):
+    h,w = tf.split(tf.cast(shape, tf.float32),2)
+    scale = tf.concat([h,w,h,w], axis=-1) - tf.constant(1.0)
+    shift = tf.constant([0.,0.,1.,1.])
     return tf.math.divide(boxes - shift,scale)
+
+
 
 def generate_anchors(scales,ratios,anchor_stride,feature_shapes,feature_strides):
     anchors = []
@@ -27,8 +35,8 @@ def generate_anchors(scales,ratios,anchor_stride,feature_shapes,feature_strides)
         feature_stride = feature_strides[i]
 
         scale, ratios = np.meshgrid(np.array(scale), np.array(ratios))
-        scale.flatten()
-        ratios.flatten()
+        scale = scale.flatten()
+        ratios = ratios.flatten()
 
         h = scale / np.sqrt(ratios)
         w = scale * np.sqrt(ratios)
@@ -39,15 +47,16 @@ def generate_anchors(scales,ratios,anchor_stride,feature_shapes,feature_strides)
         """
         center_y = np.arange(0,feature_shape[0],anchor_stride) * feature_stride
         center_x = np.arange(0,feature_shape[1],anchor_stride) * feature_stride
-
         center_x,center_y = np.meshgrid(center_x,center_y)
+
         w,center_x = np.meshgrid(w,center_x)
         h,center_y = np.meshgrid(h,center_y)
 
-        boxes_center = np.stack([center_y,center_x],axis=2).reshape(-1,2)
-        boxes_shape = np.stack([h,w],axis=2).reshape(-1,2)
+        boxes_center = np.stack([center_y,center_x],axis=2).reshape([-1,2])
+        boxes_shape = np.stack([h,w],axis=2).reshape([-1,2])
 
-        boxes = np.concatenate([boxes_center - 0.5 * boxes_shape, boxes_center + 0.5 * boxes_shape], axis=1)
+        boxes = np.concatenate([boxes_center - 0.5 * boxes_shape,
+                                boxes_center + 0.5 * boxes_shape], axis=1)
 
         anchors.append(boxes)
 
@@ -115,7 +124,7 @@ def remove_zero_padding(boxes):
     boxes = tf.boolean_mask(boxes, is_zeros)
     return boxes, is_zeros
 
-def IoU_overlap(boxes1, boxes2):
+def IoU_overlap(boxes1, boxes2): #for tf
     #tile boxes2 and loop boxes1
     box1 = tf.reshape(tf.tile(tf.expand_dims(boxes1,1), [1,1,tf.shape(boxes2)[0]]), [-1,4])
     box2 = tf.tile(boxes2, [tf.shape(boxes1)[0],1])
@@ -134,6 +143,32 @@ def IoU_overlap(boxes1, boxes2):
 
     IoU = tf.reshape(IoU, [tf.shape(boxes1)[0], tf.shape(boxes2)[0]])
     return IoU
+
+def compute_overlaps(boxes1, boxes2):
+
+    def compute_iou(box, boxes, box_area, boxes_area):
+        # Calculate intersection areas
+        y1 = np.maximum(box[0], boxes[:, 0])
+        y2 = np.minimum(box[2], boxes[:, 2])
+        x1 = np.maximum(box[1], boxes[:, 1])
+        x2 = np.minimum(box[3], boxes[:, 3])
+        intersection = np.maximum(x2 - x1, 0) * np.maximum(y2 - y1, 0)
+        union = box_area + boxes_area[:] - intersection[:]
+        iou = intersection / union
+        return iou
+
+    # Areas of anchors and GT boxes
+    area1 = (boxes1[:, 2] - boxes1[:, 0]) * (boxes1[:, 3] - boxes1[:, 1])
+    area2 = (boxes2[:, 2] - boxes2[:, 0]) * (boxes2[:, 3] - boxes2[:, 1])
+
+    # Compute overlaps to generate matrix [boxes1 count, boxes2 count]
+    # Each cell contains the IoU value.
+    overlaps = np.zeros((boxes1.shape[0], boxes2.shape[0]))
+    for i in range(overlaps.shape[1]):
+        box2 = boxes2[i]
+        overlaps[:, i] = compute_iou(box2, boxes1, area2[i], area1)
+    return overlaps
+
 
 def compute_bbox_offset(rois,gt_boxes):
     """
@@ -173,7 +208,7 @@ def parse_image_meta(meta):
         "image_shape": image_shape,
         "window": window,
         "scale": scale,
-        "class_ids": class_ids,
+        "class_ids": class_ids
     }
 
 def log2(x):
@@ -187,6 +222,7 @@ def batch_pack(x, counts, num_rows):
     for i in range(num_rows):
         outputs.append(x[i, :counts[i]])
     return tf.concat(outputs, axis=0)
+
 
 
 

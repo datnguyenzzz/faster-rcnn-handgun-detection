@@ -5,6 +5,13 @@ from tensorflow.keras import backend as K
 import utils
 
 def detection_graph(rois,gt_ids,gt_boxes,config):
+
+    Assert = [
+        tf.Assert(tf.greater(tf.shape(rois)[0], 0), [rois])
+    ]
+    with tf.control_dependencies(Assert):
+        rois = tf.identity(rois)
+
     #remove zero padding
     rois,_ = utils.remove_zero_padding(rois)
     gt_boxes,is_zeros = utils.remove_zero_padding(gt_boxes)
@@ -87,4 +94,8 @@ class TrainingDetectionLayer(layers.Layer):
         return output
 
     def compute_output_shape(self, input_shape):
-        return (None,self.num_proposal,4)
+        return [
+            (None, self.config.TRAIN_ROIS_PER_IMAGE, 4),  # rois
+            (None, self.config.TRAIN_ROIS_PER_IMAGE),  # class_ids
+            (None, self.config.TRAIN_ROIS_PER_IMAGE, 4),  # deltas
+        ]

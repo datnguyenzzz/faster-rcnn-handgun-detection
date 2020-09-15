@@ -98,7 +98,7 @@ class InferenceDetectionLayer(layers.Layer):
         image_meta = input[3]
 
         image_shape = utils.parse_image_meta(image_meta)['image_shape'][0]
-        window = utils.norm_boxes(utils.parse_image_meta(image_meta)['window'], image_shape[:2])
+        window = utils.norm_boxes_tf(utils.parse_image_meta(image_meta)['window'], image_shape[:2])
 
         detections = utils.batch_slice(
             [rois, rcnn_class, rcnn_bbox, window],
