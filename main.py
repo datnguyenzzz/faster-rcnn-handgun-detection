@@ -38,6 +38,7 @@ class TrainConfig():
         self.IMAGE_META_SIZE = 1 + 3 + 3 + 4 + 1 + self.NUM_CLASSES
 
         self.MINI_MASK_SHAPE = (56, 56)
+        self.MASK_POOL_SIZE = 14
         self.MASK_SHAPE = [28, 28]
 
         #for FPN layer

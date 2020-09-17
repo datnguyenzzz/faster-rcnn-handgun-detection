@@ -55,6 +55,42 @@ def fpn_classifier(rois, features, image_shape, pool_size, num_classes):
 
     return rcnn_class_ids, rcnn_probs, rcnn_bbox
 
+def fpn_mask(rois, features, image_shape, pool_size, num_classes):
+    #ROI pooling + projectation = ROI align
+    x = RoiAlignLayer([pool_size,pool_size], image_shape,
+                        name="roi_align_classifier")([rois] + features)
+
+    # Conv layers
+    x = KL.TimeDistributed(KL.Conv2D(256, (3, 3), padding="same"),
+                           name="mrcnn_mask_conv1")(x)
+    x = KL.TimeDistributed(BatchNorm(axis=3),
+                           name='mrcnn_mask_bn1')(x)
+    x = KL.Activation('relu')(x)
+
+    x = KL.TimeDistributed(KL.Conv2D(256, (3, 3), padding="same"),
+                           name="mrcnn_mask_conv2")(x)
+    x = KL.TimeDistributed(BatchNorm(axis=3),
+                           name='mrcnn_mask_bn2')(x)
+    x = KL.Activation('relu')(x)
+
+    x = KL.TimeDistributed(KL.Conv2D(256, (3, 3), padding="same"),
+                           name="mrcnn_mask_conv3")(x)
+    x = KL.TimeDistributed(BatchNorm(axis=3),
+                           name='mrcnn_mask_bn3')(x)
+    x = KL.Activation('relu')(x)
+
+    x = KL.TimeDistributed(KL.Conv2D(256, (3, 3), padding="same"),
+                           name="mrcnn_mask_conv4")(x)
+    x = KL.TimeDistributed(BatchNorm(axis=3),
+                           name='mrcnn_mask_bn4')(x)
+    x = KL.Activation('relu')(x)
+
+    x = KL.TimeDistributed(KL.Conv2DTranspose(256, (2, 2), strides=2, activation="relu"),
+                           name="mrcnn_mask_deconv")(x)
+    x = KL.TimeDistributed(KL.Conv2D(num_classes, (1, 1), strides=1, activation="sigmoid"),
+                           name="mrcnn_mask")(x)
+    return x
+
 
 class AnchorLayers(layers.Layer):
     def __init__(self, name="anchors", **kwargs):
@@ -218,6 +254,9 @@ class RCNN():
             #classification and regression ROIs after RPN through FPN
             rcnn_class_ids,rcnn_class_probs, rcnn_bbox = fpn_classifier(rois, RCNN_feature, config.IMAGE_SHAPE,
                                                                          config.POOL_SIZE,config.NUM_CLASSES)
+
+            rcnn_mask = fpn_mask(rois, RCNN_feature, config.IMAGE_SHAPE, config.MASK_POOL_SIZE, config.NUM_CLASSES)
+
             output_rois = layers.Lambda(lambda x:x * 1, name="output_rois")(rois)
 
             #rpn losses
