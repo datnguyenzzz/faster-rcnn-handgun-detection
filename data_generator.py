@@ -67,13 +67,10 @@ def gen(dataset, config, shuffle=True, batch_size=1):
     - input_gt_class_ids
     - input_gt_boxes
     """
-    backbone_shape = np.array([[int(math.ceil(config.IMAGE_SHAPE[0]/stride)),
-                                int(math.ceil(config.IMAGE_SHAPE[1]/stride))]
-                                for stride in config.BACKBONE_STRIDES])
     anchors = utils.generate_anchors(config.ANCHOR_SCALES,
                                      config.ANCHOR_RATIOS,
                                      config.ANCHOR_STRIDE,
-                                     backbone_shape,
+                                     config.BACKBONE_SHAPES,
                                      config.BACKBONE_STRIDES)
 
     b = 0 #batch index
@@ -99,11 +96,6 @@ def gen(dataset, config, shuffle=True, batch_size=1):
 
             #RPN targets
             rpn_match, rpn_bbox = RPN.build_targets(input_image.shape, anchors, input_gt_class_ids, input_gt_boxes, config)
-
-            ids = np.where(rpn_match==1)
-            idx = rpn_bbox[:6]
-            print("\n",ids)
-            print("\n",idx)
 
             if b==0 :
                 #initial
@@ -152,9 +144,10 @@ def gen(dataset, config, shuffle=True, batch_size=1):
                 f.write(batch_rpn_bbox)
                 f.close()
                 """
-                b=0
 
                 yield inputs, outputs
+
+                b=0
 
         except (GeneratorExit, KeyboardInterrupt):
             raise

@@ -6,21 +6,20 @@ import utils
 
 
 class RoiAlignLayer(layers.Layer):
-    def __init__(self,pool_shape,**kwargs):
+    def __init__(self,pool_shape,image_shape,**kwargs):
         super(RoiAlignLayer,self).__init__(**kwargs)
         self.pool_shape = tuple(pool_shape)
+        self.image_shape = tuple(image_shape)
 
     def call(self,input):
         rois = input[0]
-        image_meta = input[1]
-        features = input[2:]
+        features = input[1:]
         #assign feature to each rois
         y1,x1,y2,x2 = tf.split(rois,4,axis=2)
         h = y2 - y1
         w = x2 - x1
 
-        image_shape = utils.parse_image_meta(image_meta)['image_shape'][0]
-        area = tf.cast(image_shape[0] * image_shape[1], tf.float32)
+        area = tf.cast(self.image_shape[0] * self.image_shape[1], tf.float32)
         spec = utils.log2(tf.sqrt(h*w) / (224.0 / tf.sqrt(area)))
         roi_level = tf.minimum(5, tf.maximum(2, 4 + tf.cast(tf.round(spec), tf.int32)))
         roi_level = tf.squeeze(roi_level,2)
@@ -54,9 +53,8 @@ class RoiAlignLayer(layers.Layer):
         ix = tf.gather(roi_to_level[:,2],ix)
         pooled = tf.gather(pooled,ix)
 
-        shape = tf.concat([tf.shape(rois)[:2], tf.shape(pooled)[1:]], axis=0)
-        pooled = tf.reshape(pooled, shape)
+        pooled = tf.expand_dims(pooled,0)
         return pooled
 
     def compute_output_shape(self, input_shape):
-        return input_shape[0][:2] + self.pool_shape + (input_shape[2][-1], )
+        return input_shape[0][:2] + self.pool_shape + (input_shape[1][-1], )

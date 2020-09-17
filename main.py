@@ -4,6 +4,7 @@ import skimage.io
 import skimage.color
 import argparse
 import numpy as np
+import math
 
 from model import RCNN
 
@@ -36,10 +37,18 @@ class TrainConfig():
         """
         self.IMAGE_META_SIZE = 1 + 3 + 3 + 4 + 1 + self.NUM_CLASSES
 
+        self.MINI_MASK_SHAPE = (56, 56)
+        self.MASK_SHAPE = [28, 28]
+
         #for FPN layer
         self.TRAIN_BN = False
         self.PIRAMID_SIZE = 256
         self.BACKBONE_STRIDES = [4,8,16,32,64] #C2,C3,C4,C5,C6
+
+        self.BACKBONE_SHAPES = np.array(
+            [[int(math.ceil(self.IMAGE_SHAPE[0] / stride)),
+              int(math.ceil(self.IMAGE_SHAPE[1] / stride))]
+             for stride in self.BACKBONE_STRIDES])
 
         #for anchors
         self.ANCHOR_SCALES = [32,64,128,256,512]
@@ -171,7 +180,7 @@ def train(model):
 
 
     #LEARNING_RATE = 0.001
-    LEARNING_RATE = 0.001
+    LEARNING_RATE = 0.0001
     model.train(dataset_train, dataset_val, learning_rate=LEARNING_RATE, epochs = 30)
 
 

@@ -37,8 +37,11 @@ def rpn_bbox_loss_func(config, input_rpn_bbox, input_rpn_match, rpn_bbox_offset)
     batch_counts = K.sum(K.cast(K.equal(input_rpn_match, 1),tf.int32), axis=1)
     input_rpn_bbox = utils.batch_pack(input_rpn_bbox, batch_counts, config.IMAGES_PER_GPU)
 
-    loss = K.switch(tf.size(input_rpn_bbox) > 0, l1_loss(input_rpn_bbox, rpn_bbox_offset), tf.constant(0.0))
-    loss = K.mean(loss)
+    diff = K.abs(input_rpn_bbox - rpn_bbox_offset)
+    less_than_one = K.cast(K.less(diff, 1.0), "float32")
+    loss = (less_than_one * 0.5 * diff**2) + (1 - less_than_one) * (diff - 0.5)
+
+    loss = K.switch(tf.size(loss) > 0, K.mean(loss), tf.constant(0.0))
     return loss
 
 

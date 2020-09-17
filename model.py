@@ -20,19 +20,24 @@ import utils
 import losses
 import data_generator
 
+import h5py
+from tensorflow.python.keras.engine.saving import hdf5_format
 
-def fpn_classifier(rois, features, image_meta, pool_size, num_classes, train_bn=True, fc_layers_size = 1024):
+
+
+def fpn_classifier(rois, features, image_shape, pool_size, num_classes):
     #ROI pooling + projectation = ROI align
-    x = RoiAlignLayer([pool_size,pool_size])([rois,image_meta] + features)
+    x = RoiAlignLayer([pool_size,pool_size], image_shape,
+                        name="roi_align_classifier")([rois] + features)
     # 2 1024 FCs layers
     #1st layer
-    x = layers.TimeDistributed(layers.Conv2D(fc_layers_size, (pool_size,pool_size), padding="valid"),
+    x = layers.TimeDistributed(layers.Conv2D(1024, (pool_size,pool_size), padding="valid"),
                                name="mrcnn_class_conv1")(x)
-    x = layers.TimeDistributed(BatchNorm(), name='mrcnn_class_bn1')(x, training=train_bn)
+    x = layers.TimeDistributed(BatchNorm(axis=3), name='mrcnn_class_bn1')(x)
     x = layers.Activation('relu')(x)
     #2nd layer
-    x = layers.TimeDistributed(layers.Conv2D(fc_layers_size, (1,1)), name="mrcnn_class_conv2")(x)
-    x = layers.TimeDistributed(BatchNorm(), name='mrcnn_class_bn2')(x, training=train_bn)
+    x = layers.TimeDistributed(layers.Conv2D(1024, (1,1)), name="mrcnn_class_conv2")(x)
+    x = layers.TimeDistributed(BatchNorm(axis=3), name='mrcnn_class_bn2')(x)
     x = layers.Activation('relu')(x)
 
     shared = layers.Lambda(lambda x: K.squeeze(K.squeeze(x, 3), 2))(x) #h=w=1 no need that information
@@ -66,7 +71,6 @@ class RCNN():
     def __init__(self,mode,config):
         self.mode = mode
         self.config = config #config hyperparameter
-        self.anchor_cache = {} #dict
         self.model_dir = "D:\My_Code\database\model"
         self.set_log_dir()
         self.rcnn_model = self.build(mode=mode, config=config)
@@ -96,21 +100,6 @@ class RCNN():
         self.checkpoint_path = self.checkpoint_path.replace(
             "*val_loss*", "{val_loss:.2f}")
 
-    def get_anchors(self,image_shape):
-
-        backbone_shape = np.array([[int(math.ceil(image_shape[0]/stride)),int(math.ceil(image_shape[1]/stride))] for stride in self.config.BACKBONE_STRIDES])
-
-        if not tuple(image_shape) in self.anchor_cache:
-            anchors = utils.generate_anchors(self.config.ANCHOR_SCALES,
-                                             self.config.ANCHOR_RATIOS,
-                                             self.config.ANCHOR_STRIDE,
-                                             backbone_shape,
-                                             self.config.BACKBONE_STRIDES)
-
-            self.anchor_cache[tuple(image_shape)] = utils.norm_boxes_np(anchors,image_shape[:2])
-
-        return self.anchor_cache[tuple(image_shape)]
-
     def build(self,mode,config):
 
         tf.compat.v1.disable_eager_execution()
@@ -118,8 +107,8 @@ class RCNN():
         h,w = config.IMAGE_SHAPE[:2]
 
         #input
-        input_image = keras.Input(shape = [None,None,config.IMAGE_SHAPE[2]], name = "input_image")
-        input_image_meta = keras.Input(shape = [config.IMAGE_META_SIZE], name = "input_image_meta")
+        input_image = keras.Input(shape = config.IMAGE_SHAPE.tolist(), name = "input_image")
+        input_image_meta = keras.Input(shape = [None], name = "input_image_meta")
 
         if mode == "train":
             #RPN
@@ -130,15 +119,20 @@ class RCNN():
             input_gt_ids = keras.Input(shape = [None],name="input_gt_class_ids", dtype=tf.int32) #GT class IDs
             input_gt_boxes = keras.Input(shape = [None,4],name="input_gt_boxes", dtype=tf.float32)
 
-            #normalize ground truth boxes
-            gt_boxes = layers.Lambda(lambda x : utils.norm_boxes_tf(x,K.shape(input_image)[1:3]))(input_gt_boxes)
+            h,w = K.shape(input_image)[1], K.shape(input_image)[2]
+            image_scale = K.cast(K.stack([h,w,h,w],axis=0), tf.float32)
 
-        else:
-            input_anchors = KL.Input(shape=[None, 4], name="input_anchors")
+            #normalize ground truth boxes
+            gt_boxes = layers.Lambda(lambda x : x / image_scale)(input_gt_boxes)
+
+            #mini_mask
+            input_gt_masks = keras.Input(shape = [config.MINI_MASK_SHAPE[0],
+                                                  config.MINI_MASK_SHAPE[1], None],
+                                         name = "input_gt_masks", dtype=bool)
 
 
         #resnet layer
-        C1,C2,C3,C4,C5 = resnet101.build_layers(input = input_image, train_bn=config.TRAIN_BN)
+        C1,C2,C3,C4,C5 = resnet101.build_layers(input = input_image)
         #FPN
         P2,P3,P4,P5,P6 = resnet101.build_FPN(C1=C1,C2=C2,C3=C3,C4=C4,C5=C5,config=config)
 
@@ -146,19 +140,11 @@ class RCNN():
         RPN_feature = [P2,P3,P4,P5,P6]
         RCNN_feature = [P2,P3,P4,P5]
 
-
-        if mode == "train":
-            #anchors for RPN
-            anchors = self.get_anchors(config.IMAGE_SHAPE)
-            anchors = np.broadcast_to(anchors, (config.BATCH_SIZE,) + anchors.shape)
-            #anchors = layers.Lambda(lambda x : tf.Variable(anchors))(input_image)
-
-            anchor_layer = AnchorLayers(name="anchors")
-            anchors = anchor_layer(anchors)
-
-        else:
-
-            anchors = input_anchors
+        self.anchors = utils.generate_anchors(self.config.ANCHOR_SCALES,
+                                         self.config.ANCHOR_RATIOS,
+                                         self.config.ANCHOR_STRIDE,
+                                         self.config.BACKBONE_SHAPES,
+                                         self.config.BACKBONE_STRIDES)
 
         #RPN Keras model
         input_feature = keras.Input(shape=[None,None,config.PIRAMID_SIZE])
@@ -197,8 +183,22 @@ class RCNN():
             num_proposal = config.NUM_ROI_INFERENCE
 
         ROIS_proposals = ProposalLayer(num_proposal=num_proposal, nms_threshold=config.NMS_THRESHOLD,
-                                       config=config)([rpn_probs,rpn_bbox_offset,anchors])
+                                       anchors = self.anchors, config=config)([rpn_probs,rpn_bbox_offset])
 
+        """
+        if mode == "train":
+            #anchors for RPN
+            anchors = self.get_anchors(config.IMAGE_SHAPE)
+            anchors = np.broadcast_to(anchors, (config.BATCH_SIZE,) + anchors.shape)
+            #anchors = layers.Lambda(lambda x : tf.Variable(anchors))(input_image)
+
+            anchor_layer = AnchorLayers(name="anchors")
+            anchors = anchor_layer(anchors)
+
+        else:
+
+            anchors = input_anchors
+        """
         #combine together
         if mode == "train":
             #class ids
@@ -208,14 +208,16 @@ class RCNN():
             #ratio postive/negative rois = 1/3 (threshold = 0.5)
             #target_ids: class ids of gt boxes closest to positive roi
             #target_bbox = offset from positive rois to it's closest gt_box
-            rois, target_ids, target_bbox = TrainingDetectionLayer(config)([ROIS_proposals,
-                                                                            input_gt_ids,gt_boxes])
+
+            target_rois = ROIS_proposals
+
+            rois, target_ids, target_bbox, target_mask =\
+             TrainingDetectionLayer(config, name="proposal_targets")([target_rois,
+                                                                      input_gt_ids,gt_boxes, input_gt_masks])
 
             #classification and regression ROIs after RPN through FPN
-            rcnn_class_ids,rcnn_class_probs, rcnn_bbox = fpn_classifier(rois, RCNN_feature, input_image_meta,
-                                                                         config.POOL_SIZE,config.NUM_CLASSES,
-                                                                         train_bn=config.TRAIN_BN,
-                                                                         fc_layers_size=config.FPN_CLS_FC_LAYERS)
+            rcnn_class_ids,rcnn_class_probs, rcnn_bbox = fpn_classifier(rois, RCNN_feature, config.IMAGE_SHAPE,
+                                                                         config.POOL_SIZE,config.NUM_CLASSES)
             output_rois = layers.Lambda(lambda x:x * 1, name="output_rois")(rois)
 
             #rpn losses
@@ -241,7 +243,7 @@ class RCNN():
 
             model = keras.Model(inputs,outputs,name='mask_rcnn')
 
-        elif mode =="inference":
+        else:
             rcnn_class_ids,rcnn_class_probs, rcnn_bbox = fpn_classifier(ROIS_proposals, RCNN_feature, input_image_meta,
                                                                          config.POOL_SIZE,self.NUM_CLASSES,
                                                                          train_bn=config.TRAIN_BN,
@@ -259,20 +261,56 @@ class RCNN():
         #print(model.layers)
         return model
 
+    """
     def load_weights(self, path, by_name):
-        """
+
         import h5py
 
         f = h5py.File(path, "r")
         for k in f.keys():
             print(k)
             print(f[k])
-        """
+
 
         model = self.rcnn_model
         model.load_weights(path, by_name=by_name)
         print("done load pretrained coco model weights")
 
+        self.set_log_dir(path)
+    """
+
+    def load_weights(self, path, by_name):
+
+        if path == "D:\My_Code\database\model\mask_rcnn.h5":
+            exclude = ["mrcnn_class_logits", "mrcnn_bbox_fc",
+                       "mrcnn_bbox", "mrcnn_mask"]
+
+            print("lul")
+        else:
+            exclude = None
+
+        f = h5py.File(path, mode='r')
+        if 'layer_names' not in f.attrs and 'model_weights' in f:
+            f = f['model_weights']
+
+        # In multi-GPU training, we wrap the model. Get layers
+        # of the inner model because they have the weights.
+        keras_model = self.rcnn_model
+        layers = keras_model.inner_model.layers if hasattr(keras_model, "inner_model")\
+            else keras_model.layers
+
+        # Exclude some layers
+        if exclude:
+            layers = filter(lambda l: l.name not in exclude, layers)
+
+        if by_name:
+            hdf5_format.load_weights_from_hdf5_group_by_name(f, layers)
+        else:
+            hdf5_format.load_weights_from_hdf5_group(f, layers)
+        if hasattr(f, 'close'):
+            f.close()
+
+        # Update the log directory
         self.set_log_dir(path)
 
     def find_last(self):
@@ -408,6 +446,8 @@ class RCNN():
 
         #since already load pretrained model, so we don't need train backbone
         layers = r"(mrcnn\_.*)|(rpn\_.*)|(fpn\_.*)"
+        #layers=r"(res5.*)|(bn5.*)|(mrcnn\_.*)|(rpn\_.*)|(fpn\_.*)"
+        #layers = ".*"
         self.set_trainable(layers)
         self.compile(learning_rate, self.config.LEARNING_MOMENTUM)
 
