@@ -273,6 +273,9 @@ class RCNN():
             rcnn_bbox_loss = layers.Lambda(lambda x : losses.rcnn_bbox_loss_func(*x), name="mrcnn_bbox_loss")(
                              [target_bbox, target_ids, rcnn_bbox])
 
+            rcnn_mask_loss = layers.Lambda(lambda x : losses.rcnn_mask_loss_func(*x), name="mrcnn_mask_loss")(
+                             [target_mask, target_ids, rcnn_mask])
+
             #MODEL
             inputs = [input_image, input_image_meta, input_rpn_match, input_rpn_bbox, input_gt_ids, input_gt_boxes]
             outputs = [rpn_class_ids, rpn_probs, rpn_bbox_offset,
@@ -283,19 +286,9 @@ class RCNN():
             model = keras.Model(inputs,outputs,name='mask_rcnn')
 
         else:
-            rcnn_class_ids,rcnn_class_probs, rcnn_bbox = fpn_classifier(ROIS_proposals, RCNN_feature, input_image_meta,
-                                                                         config.POOL_SIZE,self.NUM_CLASSES,
-                                                                         train_bn=config.TRAIN_BN,
-                                                                         fc_layers_size=config.FPN_CLS_FC_LAYERS)
-            #detection
-            detections = InferenceDetectionLayer(config)([ROIS_proposals,rcnn_class_probs,rcnn_bbox, input_image_meta])
-
-            inputs = [input_image, input_image_meta, input_anchors]
-            output = [detections,
-                      rcnn_class_probs, rcnn_bbox,
-                      ROIS_proposals,rcnn_class_probs, rcnn_bbox]
-
-            model = keras.Model(inputs,outputs,name='mask_rcnn')
+            """
+            will do later
+            """
 
         #print(model.layers)
         return model
@@ -415,7 +408,8 @@ class RCNN():
         #self.rcnn_model._losses = []
         #self.rcnn_model._per_input_losses = []
 
-        loss_func_name = ["rpn_class_loss","rpn_bbox_loss","mrcnn_class_loss","mrcnn_bbox_loss"]
+        loss_func_name = ["rpn_class_loss","rpn_bbox_loss",
+                          "mrcnn_class_loss","mrcnn_bbox_loss","mrcnn_mask_loss"]
 
         for name in loss_func_name:
             layer = self.rcnn_model.get_layer(name)
@@ -423,8 +417,8 @@ class RCNN():
             if layer.output in self.rcnn_model.losses:
                 continue
 
-            loss = tf.math.reduce_mean(layer.output, keepdims=True)
-            self.rcnn_model.add_loss(loss)
+            self.rcnn_model.add_loss(
+                tf.reduce_mean(layer.output, keep_dims=True))
 
         #l2 Regularization
         reg_losses = [
@@ -433,7 +427,7 @@ class RCNN():
             if 'gamma' not in w.name and 'beta' not in w.name
         ]
 
-        self.rcnn_model.add_loss(tf.math.add_n(reg_losses))
+        self.rcnn_model.add_loss(tf.add_n(reg_losses))
 
         self.rcnn_model.compile(optimizer=optimizer, loss=[None] * len(self.rcnn_model.outputs))
 
