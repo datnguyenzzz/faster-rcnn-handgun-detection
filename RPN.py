@@ -58,7 +58,8 @@ def build_targets(image_shape, anchors, gt_class_ids, gt_boxes, config):
 
     rpn_match[(anchors_iou_max < 0.3) & (no_crowd_bool)] = -1
 
-    gt_iou_max_id = np.argwhere(overlap == np.max(overlap, axis=0))[:,0]
+    #gt_iou_max_id = np.argwhere(overlap == np.max(overlap, axis=0))[:,0]
+    gt_iou_max_id = np.argmax(overlap, axis=0)
     rpn_match[gt_iou_max_id] = 1
     rpn_match[anchors_iou_max >= 0.7] = 1
 

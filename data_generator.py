@@ -7,47 +7,43 @@ import RPN
 
 import utils
 
-def compose_image_meta(image_id, original_image_shape, image_shape, window, scale, active_class_ids):
+def compose_image_meta(image_id, image_shape, window, active_class_ids):
     meta = np.array(
         [image_id] +                  # size=1
-        list(original_image_shape) +  # size=3
         list(image_shape) +           # size=3
-        list(window) +                # size=4 (y1, x1, y2, x2) in image cooredinates
-        [scale] +                     # size=1
+        list(window) +                # size=4 (y1, x1, y2, x2) in image cooredinates                    # size=1
         list(active_class_ids)        # size=num_classes
     )
     return meta
 
-def load_image_gt(dataset, config, image_id):
+def load_image_gt(dataset, config, image_id, augment=False):
     image = dataset.load_image(image_id) #
-    bboxes = dataset.image_attribuites[image_id]['rects']
+    mask, class_ids = dataset.load_mask(image_id)
     scale = 1
 
     shape = image.shape
     h,w = image.shape[:2]
     window = (0,0,h,w)
 
+    if augment:
+        if random.randint(0,1):
+            image = np.fliplr(image)
+            mask = np.fliplr(mask)
+
+    _idx = np.sum(mask, axis=(0, 1)) > 0
+    mask = mask[:, :, _idx]
+    class_ids = class_ids[_idx]
+
+    bbox = utils.extract_bboxes(mask)
+
     #for image meta
 
     active_class_ids = np.ones(2, dtype=np.int32) #only have 2 active class 0:BG, 1:gun
     active_class_ids[0]=0
 
+    image_meta = compose_image_meta(image_id, shape, window, active_class_ids)
 
-    gt_boxes = np.zeros([len(bboxes),4], dtype=np.int32)
-    class_ids = np.ones(len(bboxes), dtype=np.int32)#
-
-    ix=0
-    for box in bboxes:
-        x1,y1 = box['x'],box['y']
-        w,h = box['width'], box['height']
-        x2,y2 = x1+w,y1+h
-
-        gt_boxes[ix] = np.array([y1,x1,y2,x2])
-        ix+=1
-
-    image_meta = compose_image_meta(image_id, shape, shape, window, scale, active_class_ids)
-
-    return image, image_meta, class_ids, gt_boxes.astype(np.int32)
+    return image, image_meta, class_ids, bbox, mask
 
 def mold_image(images, config):
     """Expects an RGB image (or array of images) and subtracts
@@ -56,7 +52,7 @@ def mold_image(images, config):
     """
     return images.astype(np.float32) - config.MEAN_PIXEL
 
-def gen(dataset, config, shuffle=True, batch_size=1):
+def gen(dataset, config, shuffle=True, augment=True, batch_size=1):
     """
     shuffle: shuffle image every epoch
     return:
@@ -89,7 +85,8 @@ def gen(dataset, config, shuffle=True, batch_size=1):
 
             image_id = image_ids[index]
 
-            input_image, input_image_meta, input_gt_class_ids, input_gt_boxes = load_image_gt(dataset, config, image_id)
+            input_image, input_image_meta, input_gt_class_ids, input_gt_boxes, intput_gt_masks =\
+                load_image_gt(dataset, config, image_id, augment=augment)
 
             if not np.any(input_gt_class_ids > 0):
                 continue
@@ -105,6 +102,8 @@ def gen(dataset, config, shuffle=True, batch_size=1):
                 batch_gt_boxes = np.zeros((batch_size, config.MAX_GT_INSTANCES, 4), dtype = np.int32)
                 batch_rpn_match = np.zeros([batch_size, anchors.shape[0], 1], dtype = rpn_match.dtype)
                 batch_rpn_bbox = np.zeros([batch_size, config.RPN_TRAIN_ANCHORS_PER_IMAGE, 4], dtype = rpn_bbox.dtype)
+                batch_gt_masks = np.zeros((batch_size, config.MINI_MASK_SHAPE[0], config.MINI_MASK_SHAPE[1],
+                                           config.MAX_GT_INSTANCES))
 
             if input_gt_boxes.shape[0] > config.MAX_GT_INSTANCES:
                 ids = np.random.choice(np.arange(input_gt_boxes.shape[0]),
@@ -118,6 +117,7 @@ def gen(dataset, config, shuffle=True, batch_size=1):
             batch_gt_boxes[b, :input_gt_boxes.shape[0]] = input_gt_boxes
             batch_rpn_match[b] = rpn_match[:, np.newaxis]
             batch_rpn_bbox[b] = rpn_bbox
+            batch_gt_masks[b, :, :, :input_gt_masks.shape[-1]] = input_gt_masks
 
             b+=1
 

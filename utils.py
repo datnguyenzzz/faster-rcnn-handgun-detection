@@ -197,17 +197,13 @@ def compute_bbox_offset(rois,gt_boxes):
 
 def parse_image_meta(meta):
     image_id = meta[:,0]
-    original_shape = meta[:,1:4]
-    image_shape = meta[:,4:7]
-    window = meta[:,7:11]
-    scale = meta[:,11]
-    class_ids = meta[:,12:]
+    image_shape = meta[:,1:4]
+    window = meta[:,4:7]
+    class_ids = meta[:,7:]
     return {
         "image_id": image_id,
-        "original_shape": original_shape,
         "image_shape": image_shape,
         "window": window,
-        "scale": scale,
         "class_ids": class_ids
     }
 
@@ -222,6 +218,31 @@ def batch_pack(x, counts, num_rows):
     for i in range(num_rows):
         outputs.append(x[i, :counts[i]])
     return tf.concat(outputs, axis=0)
+
+def extract_bboxes(mask):
+    """Compute bounding boxes from masks.
+    mask: [height, width, num_instances]. Mask pixels are either 1 or 0.
+
+    Returns: bbox array [num_instances, (y1, x1, y2, x2)].
+    """
+    boxes = np.zeros([mask.shape[-1], 4], dtype=np.int32)
+    for i in range(mask.shape[-1]):
+        m = mask[:, :, i]
+        # Bounding box.
+        horizontal_indicies = np.where(np.any(m, axis=0))[0]
+        vertical_indicies = np.where(np.any(m, axis=1))[0]
+        if horizontal_indicies.shape[0]:
+            x1, x2 = horizontal_indicies[[0, -1]]
+            y1, y2 = vertical_indicies[[0, -1]]
+            # x2 and y2 should not be part of the box. Increment by 1.
+            x2 += 1
+            y2 += 1
+        else:
+            # No mask for this instance. Might happen due to
+            # resizing or cropping. Set bbox to zeros
+            x1, x2, y1, y2 = 0, 0, 0, 0
+        boxes[i] = np.array([y1, x1, y2, x2])
+    return boxes.astype(np.int32)
 
 
 
