@@ -2,6 +2,7 @@ import tensorflow as tf
 import numpy as np
 import math
 import json
+import random
 
 import RPN
 
@@ -17,13 +18,22 @@ def compose_image_meta(image_id, image_shape, window, active_class_ids):
     return meta
 
 def load_image_gt(dataset, config, image_id, augment=False):
+    image_id = int(image_id)
     image = dataset.load_image(image_id) #
     mask, class_ids = dataset.load_mask(image_id)
-    scale = 1
-
     shape = image.shape
-    h,w = image.shape[:2]
-    window = (0,0,h,w)
+
+    image,window, scale, padding = utils.resize_image(
+        image,
+        min_dim = config.IMAGE_MIN_DIM,
+        max_dim = config.IMAGE_MAX_DIM,
+        padding = True
+    )
+
+    mask = utils.resize_mask(mask, scale, padding)
+
+    print(image.shape)
+    print(mask.shape)
 
     if augment:
         if random.randint(0,1):
@@ -35,6 +45,10 @@ def load_image_gt(dataset, config, image_id, augment=False):
     class_ids = class_ids[_idx]
 
     bbox = utils.extract_bboxes(mask)
+
+    mask = utils.minimize_mask(bbox, mask, config.MINI_MASK_SHAPE)
+
+    print(mask.shape)
 
     #for image meta
 
@@ -70,8 +84,8 @@ def gen(dataset, config, shuffle=True, augment=True, batch_size=1):
                                      config.BACKBONE_STRIDES)
 
     b = 0 #batch index
-    num_images = len(dataset.image_attribuites)
-    image_ids = np.arange(num_images)
+    image_ids = np.copy(dataset.image_ids)
+    print(image_ids)
     error_count = 0
 
     index=-1
@@ -85,7 +99,7 @@ def gen(dataset, config, shuffle=True, augment=True, batch_size=1):
 
             image_id = image_ids[index]
 
-            input_image, input_image_meta, input_gt_class_ids, input_gt_boxes, intput_gt_masks =\
+            input_image, input_image_meta, input_gt_class_ids, input_gt_boxes, input_gt_masks =\
                 load_image_gt(dataset, config, image_id, augment=augment)
 
             if not np.any(input_gt_class_ids > 0):
@@ -110,6 +124,7 @@ def gen(dataset, config, shuffle=True, augment=True, batch_size=1):
                                        config.MAX_GT_INSTANCES, replace=False)
                 input_gt_class_ids = input_gt_class_ids[ids]
                 input_gt_boxes = input_gt_boxes[ids]
+                input_gt_masks = input_gt_masks[:,:,ids]
 
             batch_image[b] = mold_image(input_image.astype(np.float32), config)
             batch_image_meta[b] = input_image_meta
@@ -123,7 +138,7 @@ def gen(dataset, config, shuffle=True, augment=True, batch_size=1):
 
             if b>=batch_size:
                 inputs = [batch_image, batch_image_meta, batch_rpn_match, batch_gt_boxes,
-                          batch_gt_class_ids,batch_gt_boxes]
+                          batch_gt_class_ids,batch_gt_boxes, batch_gt_masks]
                 outputs = []
 
                 """
@@ -153,7 +168,7 @@ def gen(dataset, config, shuffle=True, augment=True, batch_size=1):
             raise
         except:
             # Log it and skip the image
-            print("Error processing image: ", dataset.image_attribuites[image_id])
+            print("Error processing image: ", image_id)
             error_count += 1
             if error_count > 5:
                 raise

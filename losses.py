@@ -46,7 +46,7 @@ def rpn_bbox_loss_func(config, target_bbox, rpn_match, rpn_bbox):
 
     # Trim target bounding box deltas to the same length as rpn_bbox.
     batch_counts = K.sum(K.cast(K.equal(rpn_match, 1), tf.int32), axis=1)
-    target_bbox = batch_pack_graph(target_bbox, batch_counts,
+    target_bbox = utils.batch_pack(target_bbox, batch_counts,
                                    config.IMAGES_PER_GPU)
 
     # TODO: use smooth_l1_loss() rather than reimplementing here
@@ -102,7 +102,7 @@ def rcnn_bbox_loss_func(target_bbox, target_class_ids, pred_bbox):
                     smooth_l1_loss(y_true=target_bbox, y_pred=pred_bbox),
                     tf.constant(0.0))
     loss = K.mean(loss)
-    loss = K.reshape(loss, [1, 1])
+    #loss = K.reshape(loss, [1, 1])
     return loss
 
 def rcnn_mask_loss_func(target_masks, target_class_ids, pred_masks):
@@ -141,7 +141,7 @@ def rcnn_mask_loss_func(target_masks, target_class_ids, pred_masks):
                     K.binary_crossentropy(target=y_true, output=y_pred),
                     tf.constant(0.0))
     loss = K.mean(loss)
-    loss = K.reshape(loss, [1, 1])
+    #loss = K.reshape(loss, [1, 1])
     return loss
 
 

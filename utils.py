@@ -2,6 +2,8 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import backend as K
 from tensorflow.keras import layers
+from skimage.transform import resize
+import scipy
 
 class BatchNorm(layers.BatchNormalization):
     """
@@ -24,8 +26,6 @@ def norm_boxes_tf(boxes, shape):
     scale = tf.concat([h,w,h,w], axis=-1) - tf.constant(1.0)
     shift = tf.constant([0.,0.,1.,1.])
     return tf.math.divide(boxes - shift,scale)
-
-
 
 def generate_anchors(scales,ratios,anchor_stride,feature_shapes,feature_strides):
     anchors = []
@@ -245,8 +245,55 @@ def extract_bboxes(mask):
     return boxes.astype(np.int32)
 
 
+def minimize_mask(bbox, mask, mini_shape):
+    mini_mask = np.zeros(mini_shape + (mask.shape[-1],), dtype=bool)
+    for i in range(mask.shape[-1]):
+        m = mask[:, :, i]
+        y1, x1, y2, x2 = bbox[i][:4]
+        m = m[y1:y2, x1:x2]
+        if m.size == 0:
+            raise Exception("Invalid bounding box with area of zero")
+        m = resize(m.astype(float), mini_shape)
+        mini_mask[:, :, i] = np.where(m >= 128, 1, 0)
+    return mini_mask
+
+def resize_image(image, min_dim=None, max_dim=None, padding=False):
+    # Default window (y1, x1, y2, x2) and default scale == 1.
+    h, w = image.shape[:2]
+    window = (0, 0, h, w)
+    scale = 1
+
+    # Scale?
+    if min_dim:
+        # Scale up but not down
+        scale = max(1, min_dim / min(h, w))
+    # Does it exceed max dim?
+    if max_dim:
+        image_max = max(h, w)
+        if round(image_max * scale) > max_dim:
+            scale = max_dim / image_max
+    # Resize image and mask
+    if scale != 1:
+        image = resize(image, (round(h * scale), round(w * scale)))
+    # Need padding?
+    if padding:
+        # Get new height and width
+        h, w = image.shape[:2]
+        top_pad = (max_dim - h) // 2
+        bottom_pad = max_dim - h - top_pad
+        left_pad = (max_dim - w) // 2
+        right_pad = max_dim - w - left_pad
+        padding = [(top_pad, bottom_pad), (left_pad, right_pad), (0, 0)]
+        image = np.pad(image, padding, mode='constant', constant_values=0)
+        window = (top_pad, left_pad, h + top_pad, w + left_pad)
+    return image, window, scale, padding
 
 
+def resize_mask(mask, scale, padding):
+    h, w = mask.shape[:2]
+    mask = scipy.ndimage.zoom(mask, zoom=[scale, scale, 1], order=0)
+    mask = np.pad(mask, padding, mode='constant', constant_values=0)
+    return mask
 
 #a=tf.constant([[0,0,0,0],[0,1,2,0],[0,3,4,0],[0,0,0,0]])
 #print(tf.math.argmax(a))

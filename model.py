@@ -58,36 +58,36 @@ def fpn_classifier(rois, features, image_shape, pool_size, num_classes):
 def fpn_mask(rois, features, image_shape, pool_size, num_classes):
     #ROI pooling + projectation = ROI align
     x = RoiAlignLayer([pool_size,pool_size], image_shape,
-                        name="roi_align_classifier")([rois] + features)
+                        name="roi_align_masks")([rois] + features)
 
     # Conv layers
-    x = KL.TimeDistributed(KL.Conv2D(256, (3, 3), padding="same"),
+    x = layers.TimeDistributed(layers.Conv2D(256, (3, 3), padding="same"),
                            name="mrcnn_mask_conv1")(x)
-    x = KL.TimeDistributed(BatchNorm(axis=3),
+    x = layers.TimeDistributed(BatchNorm(axis=3),
                            name='mrcnn_mask_bn1')(x)
-    x = KL.Activation('relu')(x)
+    x = layers.Activation('relu')(x)
 
-    x = KL.TimeDistributed(KL.Conv2D(256, (3, 3), padding="same"),
+    x = layers.TimeDistributed(layers.Conv2D(256, (3, 3), padding="same"),
                            name="mrcnn_mask_conv2")(x)
-    x = KL.TimeDistributed(BatchNorm(axis=3),
+    x = layers.TimeDistributed(BatchNorm(axis=3),
                            name='mrcnn_mask_bn2')(x)
-    x = KL.Activation('relu')(x)
+    x = layers.Activation('relu')(x)
 
-    x = KL.TimeDistributed(KL.Conv2D(256, (3, 3), padding="same"),
+    x = layers.TimeDistributed(layers.Conv2D(256, (3, 3), padding="same"),
                            name="mrcnn_mask_conv3")(x)
-    x = KL.TimeDistributed(BatchNorm(axis=3),
+    x = layers.TimeDistributed(BatchNorm(axis=3),
                            name='mrcnn_mask_bn3')(x)
-    x = KL.Activation('relu')(x)
+    x = layers.Activation('relu')(x)
 
-    x = KL.TimeDistributed(KL.Conv2D(256, (3, 3), padding="same"),
+    x = layers.TimeDistributed(layers.Conv2D(256, (3, 3), padding="same"),
                            name="mrcnn_mask_conv4")(x)
-    x = KL.TimeDistributed(BatchNorm(axis=3),
+    x = layers.TimeDistributed(BatchNorm(axis=3),
                            name='mrcnn_mask_bn4')(x)
-    x = KL.Activation('relu')(x)
+    x = layers.Activation('relu')(x)
 
-    x = KL.TimeDistributed(KL.Conv2DTranspose(256, (2, 2), strides=2, activation="relu"),
+    x = layers.TimeDistributed(layers.Conv2DTranspose(256, (2, 2), strides=2, activation="relu"),
                            name="mrcnn_mask_deconv")(x)
-    x = KL.TimeDistributed(KL.Conv2D(num_classes, (1, 1), strides=1, activation="sigmoid"),
+    x = layers.TimeDistributed(layers.Conv2D(num_classes, (1, 1), strides=1, activation="sigmoid"),
                            name="mrcnn_mask")(x)
     return x
 
@@ -277,11 +277,12 @@ class RCNN():
                              [target_mask, target_ids, rcnn_mask])
 
             #MODEL
-            inputs = [input_image, input_image_meta, input_rpn_match, input_rpn_bbox, input_gt_ids, input_gt_boxes]
+            inputs = [input_image, input_image_meta, input_rpn_match, input_rpn_bbox,
+                      input_gt_ids, input_gt_boxes, input_gt_masks]
             outputs = [rpn_class_ids, rpn_probs, rpn_bbox_offset,
-                       rcnn_class_ids,rcnn_class_probs, rcnn_bbox,
+                       rcnn_class_ids,rcnn_class_probs, rcnn_bbox, rcnn_mask,
                        ROIS_proposals, output_rois,
-                       rpn_class_loss, rpn_bbox_loss, rcnn_class_loss, rcnn_bbox_loss]
+                       rpn_class_loss, rpn_bbox_loss, rcnn_class_loss, rcnn_bbox_loss, rcnn_mask_loss]
 
             model = keras.Model(inputs,outputs,name='mask_rcnn')
 
@@ -418,7 +419,7 @@ class RCNN():
                 continue
 
             self.rcnn_model.add_loss(
-                tf.reduce_mean(layer.output, keep_dims=True))
+                tf.math.reduce_mean(layer.output, keepdims=True))
 
         #l2 Regularization
         reg_losses = [
