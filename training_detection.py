@@ -4,8 +4,8 @@ from tensorflow.keras import backend as K
 
 import utils
 
-def detection_graph(rois,gt_ids,gt_boxes,gt_masks, config):
-
+#def detection_graph(rois,gt_ids,gt_boxes,gt_masks, config):
+def detection_graph(rois,gt_ids,gt_boxes, config):
     Assert = [
         tf.Assert(tf.greater(tf.shape(rois)[0], 0), [rois])
     ]
@@ -16,7 +16,7 @@ def detection_graph(rois,gt_ids,gt_boxes,gt_masks, config):
     rois,_ = utils.remove_zero_padding(rois)
     gt_boxes,is_zeros = utils.remove_zero_padding(gt_boxes)
     gt_ids = tf.boolean_mask(gt_ids, is_zeros)
-    gt_masks = tf.gather(gt_masks, tf.where(is_zeros)[:,0], axis=2)
+    #gt_masks = tf.gather(gt_masks, tf.where(is_zeros)[:,0], axis=2)
 
     #handle crowd
     # A crowd box in COCO is a bounding box around several instances. Exclude
@@ -24,10 +24,10 @@ def detection_graph(rois,gt_ids,gt_boxes,gt_masks, config):
     crowd_ids = tf.where(gt_ids < 0)[:,0]
     non_crowd_ids = tf.where(gt_ids > 0)[:,0]
     crowd_gt_boxes = tf.gather(gt_boxes, crowd_ids)
-    crowd_masks = tf.gather(gt_masks, crowd_ids, axis=2)
+    #crowd_masks = tf.gather(gt_masks, crowd_ids, axis=2)
     gt_ids = tf.gather(gt_ids, non_crowd_ids)
     gt_boxes = tf.gather(gt_boxes,non_crowd_ids)
-    gt_masks =tf.gather(gt_masks,non_crowd_ids, axis=2)
+    #gt_masks =tf.gather(gt_masks,non_crowd_ids, axis=2)
 
     #compute IoU  between rois and crowd/non crowd GT boxes
     IoU_non_crowd = utils.IoU_overlap(rois,gt_boxes)
@@ -64,6 +64,7 @@ def detection_graph(rois,gt_ids,gt_boxes,gt_masks, config):
     bbox_offset = utils.compute_bbox_offset(positive_rois, roi_gt_boxes)
     bbox_offset /= config.BBOX_STD_DEV
 
+    """
     transposed_masks = tf.expand_dims(tf.transpose(gt_masks, [2,0,1]), -1)
     roi_masks = tf.gather(transposed_masks, roi_gt_box_assignment)
 
@@ -83,7 +84,7 @@ def detection_graph(rois,gt_ids,gt_boxes,gt_masks, config):
 
     masks = tf.squeeze(masks, axis=3)
     masks = tf.round(masks)
-
+    """
     rois = tf.concat([positive_rois,negative_rois], axis=0)
     N = tf.shape(negative_rois)[0]
     P = tf.maximum(config.TRAIN_ROIS_PER_IMAGE - tf.shape(rois)[0],0)
@@ -92,9 +93,10 @@ def detection_graph(rois,gt_ids,gt_boxes,gt_masks, config):
     roi_gt_boxes = tf.pad(roi_gt_boxes, [(0, N+P), (0, 0)])
     roi_gt_ids = tf.pad(roi_gt_ids, [(0, N+P)])
     bbox_offset = tf.pad(bbox_offset, [(0, N+P), (0, 0)])
-    masks = tf.pad(masks, [[0,N+P], (0,0), (0,0)])
+    #masks = tf.pad(masks, [[0,N+P], (0,0), (0,0)])
 
-    return rois, roi_gt_ids, bbox_offset, masks
+    #return rois, roi_gt_ids, bbox_offset, masks
+    return rois, roi_gt_ids, bbox_offset
 
 class TrainingDetectionLayer(layers.Layer):
     def __init__(self,config,**kwargs):
@@ -105,10 +107,14 @@ class TrainingDetectionLayer(layers.Layer):
         rois = input[0]
         gt_ids = input[1]
         gt_boxes = input[2]
-        gt_masks = input[3]
+        #gt_masks = input[3]
 
-        names = ["rois", "target_class_ids", "target_bbox", "target_mask"]
-        output = utils.batch_slice([rois,gt_ids,gt_boxes,gt_masks], lambda x,y,z,w : detection_graph(x,y,z,w,self.config),
+        #names = ["rois", "target_class_ids", "target_bbox", "target_mask"]
+        names = ["rois", "target_class_ids", "target_bbox"]
+        #output = utils.batch_slice([rois,gt_ids,gt_boxes,gt_masks], lambda x,y,z,w : detection_graph(x,y,z,w,self.config),
+        #                           self.config.IMAGES_PER_GPU, names=names)
+
+        output = utils.batch_slice([rois,gt_ids,gt_boxes], lambda x,y,z : detection_graph(x,y,z,self.config),
                                    self.config.IMAGES_PER_GPU, names=names)
 
         return output
@@ -118,7 +124,7 @@ class TrainingDetectionLayer(layers.Layer):
             (None, self.config.TRAIN_ROIS_PER_IMAGE, 4),  # rois
             (None, 1),  # class_ids
             (None, self.config.TRAIN_ROIS_PER_IMAGE, 4),  # deltas
-            (None, self.config.TRAIN_ROIS_PER_IMAGE, self.config.MASK_SHAPE[0], self.config.MASK_SHAPE[1])
+            #(None, self.config.TRAIN_ROIS_PER_IMAGE, self.config.MASK_SHAPE[0], self.config.MASK_SHAPE[1])
         ]
 
     def compute_mask(self, inputs, mask=None):

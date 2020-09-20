@@ -15,18 +15,6 @@ class BatchNorm(layers.BatchNormalization):
     def call(self, input, training=None):
         return super(type(self), self).call(input, training = training)
 
-def norm_boxes_np(boxes, shape):
-    h, w = shape
-    scale = np.array([h - 1, w - 1, h - 1, w - 1])
-    shift = np.array([0, 0, 1, 1])
-    return np.divide((boxes - shift), scale).astype(np.float32)
-
-def norm_boxes_tf(boxes, shape):
-    h,w = tf.split(tf.cast(shape, tf.float32),2)
-    scale = tf.concat([h,w,h,w], axis=-1) - tf.constant(1.0)
-    shift = tf.constant([0.,0.,1.,1.])
-    return tf.math.divide(boxes - shift,scale)
-
 def generate_anchors(scales,ratios,anchor_stride,feature_shapes,feature_strides):
     anchors = []
     for i in range(len(scales)):
@@ -139,12 +127,17 @@ def IoU_overlap(boxes1, boxes2): #for tf
 
     I = tf.maximum(x2-x1,0) * tf.maximum(y2-y1,0)
     U = (y21-y11)*(x21-x11) + (y22-y12)*(x22-x12) - I
+
+    #print(tf.where(U==0.0))
+
     IoU = I/U
 
     IoU = tf.reshape(IoU, [tf.shape(boxes1)[0], tf.shape(boxes2)[0]])
     return IoU
 
 def compute_overlaps(boxes1, boxes2):
+
+    #print("fucknp ",boxes1,boxes2)
 
     def compute_iou(box, boxes, box_area, boxes_area):
         # Calculate intersection areas
@@ -154,6 +147,8 @@ def compute_overlaps(boxes1, boxes2):
         x2 = np.minimum(box[3], boxes[:, 3])
         intersection = np.maximum(x2 - x1, 0) * np.maximum(y2 - y1, 0)
         union = box_area + boxes_area[:] - intersection[:]
+        #assert(np.where(union==0.0).shape[0]==0)
+        #print(len(np.where(union==0.0)))
         iou = intersection / union
         return iou
 
@@ -187,6 +182,8 @@ def compute_bbox_offset(rois,gt_boxes):
     gt_center_y = gt_boxes[:,0] + 0.5 * gt_h
     gt_center_x = gt_boxes[:,1] + 0.5 * gt_w
 
+    assert(h!=0)
+    assert(w!=0)
     dy = (gt_center_y - center_y) / h
     dx = (gt_center_x - center_x) / w
     dh = tf.math.log(gt_h / h)

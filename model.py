@@ -162,9 +162,9 @@ class RCNN():
             gt_boxes = layers.Lambda(lambda x : x / image_scale)(input_gt_boxes)
 
             #mini_mask
-            input_gt_masks = keras.Input(shape = [config.MINI_MASK_SHAPE[0],
-                                                  config.MINI_MASK_SHAPE[1], None],
-                                         name = "input_gt_masks", dtype=bool)
+            #input_gt_masks = keras.Input(shape = [config.MINI_MASK_SHAPE[0],
+            #                                      config.MINI_MASK_SHAPE[1], None],
+            #                             name = "input_gt_masks", dtype=bool)
 
 
         #resnet layer
@@ -204,12 +204,12 @@ class RCNN():
             layer_outputs.append(RPN_model([x]))
 
         output_names = ["rpn_class_logits", "rpn_class", "rpn_bbox"]
-        layer_outputs = list(zip(*layer_outputs))
-        layer_outputs = [layers.Concatenate(axis=1, name = n)(list(o))
-                         for o,n in zip(layer_outputs, output_names)]
+        outputs = list(zip(*layer_outputs))
+        outputs = [layers.Concatenate(axis=1, name = n)(list(o))
+                         for o,n in zip(outputs, output_names)]
 
         #rpn_class_cls, rpn_probs, rpn_bbox = layer_outputs
-        rpn_class_ids, rpn_probs, rpn_bbox_offset = layer_outputs
+        rpn_class_ids, rpn_probs, rpn_bbox_offset = outputs
 
 
         #Proposal layer
@@ -221,20 +221,6 @@ class RCNN():
         ROIS_proposals = ProposalLayer(num_proposal=num_proposal, nms_threshold=config.NMS_THRESHOLD,
                                        anchors = self.anchors, config=config)([rpn_probs,rpn_bbox_offset])
 
-        """
-        if mode == "train":
-            #anchors for RPN
-            anchors = self.get_anchors(config.IMAGE_SHAPE)
-            anchors = np.broadcast_to(anchors, (config.BATCH_SIZE,) + anchors.shape)
-            #anchors = layers.Lambda(lambda x : tf.Variable(anchors))(input_image)
-
-            anchor_layer = AnchorLayers(name="anchors")
-            anchors = anchor_layer(anchors)
-
-        else:
-
-            anchors = input_anchors
-        """
         #combine together
         if mode == "train":
             #class ids
@@ -247,15 +233,19 @@ class RCNN():
 
             target_rois = ROIS_proposals
 
-            rois, target_ids, target_bbox, target_mask =\
+            #rois, target_ids, target_bbox, target_mask =\
+            # TrainingDetectionLayer(config, name="proposal_targets")([target_rois,
+            #                                                          input_gt_ids,gt_boxes, input_gt_masks])
+
+            rois, target_ids, target_bbox =\
              TrainingDetectionLayer(config, name="proposal_targets")([target_rois,
-                                                                      input_gt_ids,gt_boxes, input_gt_masks])
+                                                                      input_gt_ids,gt_boxes])
 
             #classification and regression ROIs after RPN through FPN
             rcnn_class_ids,rcnn_class_probs, rcnn_bbox = fpn_classifier(rois, RCNN_feature, config.IMAGE_SHAPE,
                                                                          config.POOL_SIZE,config.NUM_CLASSES)
 
-            rcnn_mask = fpn_mask(rois, RCNN_feature, config.IMAGE_SHAPE, config.MASK_POOL_SIZE, config.NUM_CLASSES)
+            #rcnn_mask = fpn_mask(rois, RCNN_feature, config.IMAGE_SHAPE, config.MASK_POOL_SIZE, config.NUM_CLASSES)
 
             output_rois = layers.Lambda(lambda x:x * 1, name="output_rois")(rois)
 
@@ -273,23 +263,49 @@ class RCNN():
             rcnn_bbox_loss = layers.Lambda(lambda x : losses.rcnn_bbox_loss_func(*x), name="mrcnn_bbox_loss")(
                              [target_bbox, target_ids, rcnn_bbox])
 
-            rcnn_mask_loss = layers.Lambda(lambda x : losses.rcnn_mask_loss_func(*x), name="mrcnn_mask_loss")(
-                             [target_mask, target_ids, rcnn_mask])
+            #rcnn_mask_loss = layers.Lambda(lambda x : losses.rcnn_mask_loss_func(*x), name="mrcnn_mask_loss")(
+            #                 [target_mask, target_ids, rcnn_mask])
 
             #MODEL
+            """
             inputs = [input_image, input_image_meta, input_rpn_match, input_rpn_bbox,
                       input_gt_ids, input_gt_boxes, input_gt_masks]
             outputs = [rpn_class_ids, rpn_probs, rpn_bbox_offset,
                        rcnn_class_ids,rcnn_class_probs, rcnn_bbox, rcnn_mask,
                        ROIS_proposals, output_rois,
                        rpn_class_loss, rpn_bbox_loss, rcnn_class_loss, rcnn_bbox_loss, rcnn_mask_loss]
+            """
+            inputs = [input_image, input_image_meta, input_rpn_match, input_rpn_bbox,
+                      input_gt_ids, input_gt_boxes]
+            outputs = [rpn_class_ids, rpn_probs, rpn_bbox_offset,
+                       rcnn_class_ids,rcnn_class_probs, rcnn_bbox,
+                       ROIS_proposals, output_rois,
+                       rpn_class_loss, rpn_bbox_loss, rcnn_class_loss, rcnn_bbox_loss]
 
             model = keras.Model(inputs,outputs,name='mask_rcnn')
 
         else:
-            """
-            will do later
-            """
+            rcnn_class_ids,rcnn_class_probs, rcnn_bbox =\
+                fpn_classifier(ROIS_proposals, RCNN_feature, config.IMAGE_SHAPE,
+                               config.POOL_SIZE,config.NUM_CLASSES)
+
+            #[N, (y1, x1, y2, x2, class_id, score)]
+            detections = InferenceDetectionLayer(config, name="mrcnn_detection")(
+                [ROIS_proposals,rcnn_class_probs,rcnn_bbox,input_image_meta]
+            )
+
+            h,w = config.IMAGE_SHAPE[:2]
+
+            detection_boxes = layers.Lambda(
+                              lambda x: x[..., :4] / np.array([h,w,h,w]))(detections)
+
+            inputs = [input_image, input_image_meta]
+            outputs = [detection_boxes, rcnn_class_probs, rcnn_bbox,
+                      ROIS_proposals, rpn_probs, rpn_bbox_offset]
+
+            model = keras.Model(inputs,outputs,name='mask_rcnn')
+
+
 
         #print(model.layers)
         return model
@@ -409,8 +425,13 @@ class RCNN():
         #self.rcnn_model._losses = []
         #self.rcnn_model._per_input_losses = []
 
+        """
         loss_func_name = ["rpn_class_loss","rpn_bbox_loss",
                           "mrcnn_class_loss","mrcnn_bbox_loss","mrcnn_mask_loss"]
+        """
+
+        loss_func_name = ["rpn_class_loss","rpn_bbox_loss",
+                          "mrcnn_class_loss","mrcnn_bbox_loss"]
 
         for name in loss_func_name:
             layer = self.rcnn_model.get_layer(name)

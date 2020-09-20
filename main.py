@@ -21,11 +21,11 @@ class TrainConfig():
         self.NAME = "gun"
 
         self.IMAGES_PER_GPU = 1
-        self.NUM_CLASSES = 1 + 2 # gun people BG
+        self.NUM_CLASSES = 1 + 1
         self.BATCH_SIZE = self.IMAGES_PER_GPU
         self.DETECTION_MIN_CONFIDENCE = 0.9
-        self.IMAGE_MIN_DIM = 384
-        self.IMAGE_MAX_DIM = 384
+        self.IMAGE_MIN_DIM = 832
+        self.IMAGE_MAX_DIM = 832
         self.IMAGE_SHAPE = np.array([self.IMAGE_MAX_DIM, self.IMAGE_MAX_DIM,3])
 
         """
@@ -53,7 +53,7 @@ class TrainConfig():
              for stride in self.BACKBONE_STRIDES])
 
         #for anchors
-        self.ANCHOR_SCALES = [32,64,128,256,512]
+        self.ANCHOR_SCALES = (32,64,128,256,512)
         self.ANCHOR_RATIOS = [0.5,1,2]
         self.ANCHOR_STRIDE = 1
         self.RPN_TRAIN_ANCHORS_PER_IMAGE = 256
@@ -62,7 +62,7 @@ class TrainConfig():
         self.NUM_ROI_TRAINING = 2000
         self.NUM_ROI_INFERENCE = 1000
         self.NMS_THRESHOLD = 0.7 #Non-Max suppression for choosing ROI
-        self.BBOX_STD_DEV = np.array([0.1,0.1,0.2,0.2]) #standard deviation
+        self.BBOX_STD_DEV =  np.array([0.1, 0.1, 0.2, 0.2]) #standard deviation
         self.PRE_NMS_LIMIT = 6000
         self.TRAIN_ROIS_PER_IMAGE = 200
         self.POSITIVE_ROI_RATIO = 0.33
@@ -95,7 +95,9 @@ class InferenceConfig():
         self.NUM_CLASSES = 2
         self.BATCH_SIZE = self.IMAGES_PER_GPU
         self.DETECTION_MIN_CONFIDENCE = 0.9
-        self.IMAGE_SHAPE = np.array([832, 832,3])
+        self.IMAGE_MIN_DIM = 832
+        self.IMAGE_MAX_DIM = 832
+        self.IMAGE_SHAPE = np.array([self.IMAGE_MAX_DIM, self.IMAGE_MAX_DIM,3])
         """
         all image attributes:
         image_id size = 1
@@ -105,8 +107,6 @@ class InferenceConfig():
         scale
         active classes ids
         """
-        self.IMAGE_META_SIZE = 1 + 3 + 3 + 4 + 1 + self.NUM_CLASSES
-
         self.DETECTION_MAX_INSTANCES = 100
         self.DETECTION_NMS_THRESHOLD = 0.3
 
@@ -170,43 +170,16 @@ class Dataset():
                 if i == 0 or source == info['source']:
                     self.source_class_ids[source].append(i)
 
-    def map_source_class_id(self, source_class_id):
-        return self.class_from_source_map[source_class_id]
-
-    def get_source_class_id(self, class_id, source):
-        """Map an internal class ID to the corresponding class ID in the source dataset."""
-        info = self.class_info[class_id]
-        assert info['source'] == source
-        return info['id']
-
-    def append_data(self, class_info, image_info):
-        self.external_to_class_id = {}
-        for i, c in enumerate(self.class_info):
-            for ds, id in c["map"]:
-                self.external_to_class_id[ds + str(id)] = i
-
-        # Map external image IDs to internal ones.
-        self.external_to_image_id = {}
-        for i, info in enumerate(self.image_info):
-            self.external_to_image_id[info["ds"] + str(info["id"])] = i
-
     @property
     def image_ids(self):
         return self._image_ids
-
-    def source_image_link(self, image_id):
-        """Returns the path or URL to the image.
-        Override this to return a URL to the image if it's availble online for easy
-        debugging.
-        """
-        return self.image_info[image_id]["path"]
 
     def load_image(self, image_id):
         """Load the specified image and return a [H,W,3] Numpy array.
         """
         # Load image
 
-        image_id = 2 * image_id
+        #image_id = 2 * image_id
 
         #print(self.image_info[image_id]['path'])
 
@@ -217,33 +190,22 @@ class Dataset():
         return image
 
     def load_mask(self, image_id):
-        info_people = self.image_info[2*image_id]
-        info_gun = self.image_info[2*image_id + 1]
+        info = self.image_info[image_id]
 
-        assert(info_people["height"] == info_gun["height"])
-        assert(info_people["width"] == info_gun["width"])
-        assert(info_people["path"] == info_gun["path"])
+        mask = np.zeros([info["height"], info["width"],
+                        len(info["polygons"])], dtype=np.uint8)
 
-        mask = np.zeros([info_people["height"], info_people["width"],
-                        len(info_people["polygons"]) + len(info_gun["polygons"])], dtype=np.uint8)
-
-        for i,p in enumerate(info_people["polygons"]):
+        for i,p in enumerate(info["polygons"]):
             rr,cc = skimage.draw.polygon(p['all_points_y'], p['all_points_x'])
             mask[rr,cc,i] = 1
 
-        for i,p in enumerate(info_gun["polygons"]):
-            rr,cc = skimage.draw.polygon(p['all_points_y'], p['all_points_x'])
-            mask[rr,cc,i + len(info_people["polygons"])] = 1
-
         class_ids = np.ones([mask.shape[-1]], dtype=np.int32)
-        class_ids[len(info_people["polygons"]) : ] = 2
 
         return mask, class_ids
 
     def load_attributes(self, subset):
 
-        self.add_class("people",1,"people")
-        self.add_class("gun",2,"gun")
+        self.add_class("gun",1,"gun")
 
         dataset_dir = os.path.join(IMAGES, subset)
         ann_link = ANNOTATIONS + "\\" + subset + ".json"
@@ -258,20 +220,12 @@ class Dataset():
 
             object_name = [r['region_attributes'] for r in a['regions']]
 
-            #print(object_name)
-            #print(polygons)
-
-            obj_name0 = []
-            polygons0 = []
             obj_name1 = []
             polygons1 = []
 
             for i,p in enumerate(object_name):
                 #print(i,p)
-                if p["object"] == "people":
-                    obj_name0.append(p)
-                    polygons0.append(polygons[i])
-                else:
+                if p["object"] == "gun":
                     obj_name1.append(p)
                     polygons1.append(polygons[i])
 
@@ -284,18 +238,10 @@ class Dataset():
             h,w = image.shape[:2]
 
             self.add_image(
-                "people",
-                image_id = a['filename'],
-                path = image_path,
-                height = h, width = w,
-                polygons = polygons0
-            )
-
-            self.add_image(
                 "gun",
                 image_id = a['filename'],
                 path = image_path,
-                height = h, width=w,
+                height = h, width = w,
                 polygons = polygons1
             )
 
@@ -311,7 +257,7 @@ def train(model):
 
 
     #LEARNING_RATE = 0.001
-    LEARNING_RATE = 0.0001
+    LEARNING_RATE = 0.0000005
     model.train(dataset_train, dataset_val, learning_rate=LEARNING_RATE, epochs = 30)
 
 
@@ -344,3 +290,5 @@ model.load_weights(weight_path, by_name=True)
 
 if args.command == "train":
     train(model)
+else:
+    

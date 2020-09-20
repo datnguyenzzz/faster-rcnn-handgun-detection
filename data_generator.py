@@ -32,15 +32,18 @@ def load_image_gt(dataset, config, image_id, augment=False):
 
     mask = utils.resize_mask(mask, scale, padding)
 
-    print(image.shape)
-    print(mask.shape)
+    #print(image.shape)
+    #print(mask.shape)
 
     if augment:
         if random.randint(0,1):
             image = np.fliplr(image)
             mask = np.fliplr(mask)
 
-    _idx = np.sum(mask, axis=(0, 1)) > 0
+    #_idx = np.sum(mask, axis=(0, 1)) > 0
+    #mask = mask[:, :, _idx]
+    #class_ids = class_ids[_idx]
+    _idx = np.sum(np.where(mask > 0, 1, 0), axis=(0, 1)) >= 0
     mask = mask[:, :, _idx]
     class_ids = class_ids[_idx]
 
@@ -48,12 +51,13 @@ def load_image_gt(dataset, config, image_id, augment=False):
 
     mask = utils.minimize_mask(bbox, mask, config.MINI_MASK_SHAPE)
 
-    print(mask.shape)
+    #print(mask.shape)
 
     #for image meta
 
-    active_class_ids = np.ones(2, dtype=np.int32) #only have 2 active class 0:BG, 1:gun
-    active_class_ids[0]=0
+    active_class_ids = np.zeros([dataset.num_classes], dtype=np.int32)
+    source_class_ids = dataset.source_class_ids[dataset.image_info[image_id]["source"]]
+    active_class_ids[source_class_ids] = 1
 
     image_meta = compose_image_meta(image_id, shape, window, active_class_ids)
 
@@ -85,7 +89,7 @@ def gen(dataset, config, shuffle=True, augment=True, batch_size=1):
 
     b = 0 #batch index
     image_ids = np.copy(dataset.image_ids)
-    print(image_ids)
+    #print(image_ids)
     error_count = 0
 
     index=-1
@@ -107,7 +111,6 @@ def gen(dataset, config, shuffle=True, augment=True, batch_size=1):
 
             #RPN targets
             rpn_match, rpn_bbox = RPN.build_targets(input_image.shape, anchors, input_gt_class_ids, input_gt_boxes, config)
-
             if b==0 :
                 #initial
                 batch_image = np.zeros((batch_size, ) + input_image.shape, dtype = np.float32)
@@ -137,9 +140,15 @@ def gen(dataset, config, shuffle=True, augment=True, batch_size=1):
             b+=1
 
             if b>=batch_size:
+                """
                 inputs = [batch_image, batch_image_meta, batch_rpn_match, batch_gt_boxes,
                           batch_gt_class_ids,batch_gt_boxes, batch_gt_masks]
                 outputs = []
+                """
+                inputs = [batch_image, batch_image_meta, batch_rpn_match, batch_gt_boxes,
+                          batch_gt_class_ids,batch_gt_boxes]
+                outputs = []
+
 
                 """
                 f = open("D:\My_Code\gun_detection\\todo.txt","w")
