@@ -8,15 +8,6 @@ import RPN
 
 import utils
 
-def compose_image_meta(image_id, image_shape, window, active_class_ids):
-    meta = np.array(
-        [image_id] +                  # size=1
-        list(image_shape) +           # size=3
-        list(window) +                # size=4 (y1, x1, y2, x2) in image cooredinates                    # size=1
-        list(active_class_ids)        # size=num_classes
-    )
-    return meta
-
 def load_image_gt(dataset, config, image_id, augment=False):
     image_id = int(image_id)
     image = dataset.load_image(image_id) #
@@ -59,16 +50,9 @@ def load_image_gt(dataset, config, image_id, augment=False):
     source_class_ids = dataset.source_class_ids[dataset.image_info[image_id]["source"]]
     active_class_ids[source_class_ids] = 1
 
-    image_meta = compose_image_meta(image_id, shape, window, active_class_ids)
+    image_meta = utils.compose_image_meta(image_id, shape, window, active_class_ids)
 
     return image, image_meta, class_ids, bbox, mask
-
-def mold_image(images, config):
-    """Expects an RGB image (or array of images) and subtracts
-    the mean pixel and converts it to float. Expects image
-    colors in RGB order.
-    """
-    return images.astype(np.float32) - config.MEAN_PIXEL
 
 def gen(dataset, config, shuffle=True, augment=True, batch_size=1):
     """
@@ -129,7 +113,7 @@ def gen(dataset, config, shuffle=True, augment=True, batch_size=1):
                 input_gt_boxes = input_gt_boxes[ids]
                 input_gt_masks = input_gt_masks[:,:,ids]
 
-            batch_image[b] = mold_image(input_image.astype(np.float32), config)
+            batch_image[b] = utils.mold_image(input_image.astype(np.float32), config)
             batch_image_meta[b] = input_image_meta
             batch_gt_class_ids[b, :input_gt_class_ids.shape[0]] = input_gt_class_ids
             batch_gt_boxes[b, :input_gt_boxes.shape[0]] = input_gt_boxes

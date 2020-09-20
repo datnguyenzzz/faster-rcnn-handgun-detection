@@ -260,6 +260,11 @@ def train(model):
     LEARNING_RATE = 0.0000005
     model.train(dataset_train, dataset_val, learning_rate=LEARNING_RATE, epochs = 30)
 
+def detect_image(model, image_path=None):
+    print("Image detection start")
+    image = skimage.io.imread(image_path)
+
+    r = model.detect(image, verbose=1)[0]
 
 ################################################################################
 #command: main python main.py train/inference --weights=coco/last
@@ -291,4 +296,5 @@ model.load_weights(weight_path, by_name=True)
 if args.command == "train":
     train(model)
 else:
-    
+    if args.image!=None:
+        detect_image(model, image_path=args.image)

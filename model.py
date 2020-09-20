@@ -294,39 +294,20 @@ class RCNN():
                 [ROIS_proposals,rcnn_class_probs,rcnn_bbox,input_image_meta]
             )
 
-            h,w = config.IMAGE_SHAPE[:2]
+            #h,w = config.IMAGE_SHAPE[:2]
 
-            detection_boxes = layers.Lambda(
-                              lambda x: x[..., :4] / np.array([h,w,h,w]))(detections)
+            #detection_boxes = layers.Lambda(
+            #                  lambda x: x[..., :4] / np.array([h,w,h,w]))(detections)
 
             inputs = [input_image, input_image_meta]
-            outputs = [detection_boxes, rcnn_class_probs, rcnn_bbox,
+            outputs = [detections, rcnn_class_probs, rcnn_bbox,
                       ROIS_proposals, rpn_probs, rpn_bbox_offset]
 
             model = keras.Model(inputs,outputs,name='mask_rcnn')
 
 
-
         #print(model.layers)
         return model
-
-    """
-    def load_weights(self, path, by_name):
-
-        import h5py
-
-        f = h5py.File(path, "r")
-        for k in f.keys():
-            print(k)
-            print(f[k])
-
-
-        model = self.rcnn_model
-        model.load_weights(path, by_name=by_name)
-        print("done load pretrained coco model weights")
-
-        self.set_log_dir(path)
-    """
 
     def load_weights(self, path, by_name):
 
@@ -522,3 +503,75 @@ class RCNN():
         )
 
         self.epoch = max(self.epoch, epochs)
+
+    def mold_inputs(self,image):
+
+        molded_image,window, scale, padding = utils.resize_image(
+            image,
+            min_dim = config.IMAGE_MIN_DIM,
+            max_dim = config.IMAGE_MAX_DIM,
+            padding = True
+        )
+
+        molded_image = utils.mold_image(molded_image, self.config)
+
+        image_meta = utils.compose_image_meta(0, image.shape, window,
+                            np.zeros([self.config.NUM_CLASSES], dtype=np.int32))
+
+        return molded_image, image_meta, window
+
+    def unmold_detections(self, detection, image_shape, window):
+        zero_ix = np.where(detections[:, 4] == 0)[0]
+        N = zero_ix[0] if zero_ix.shape[0] > 0 else detections.shape[0]
+
+        # Extract boxes, class_ids, scores, and class-specific masks
+        boxes = detections[:N, :4]
+        class_ids = detections[:N, 4].astype(np.int32)
+        scores = detections[:N, 5]
+
+        # Compute scale and shift to translate coordinates to image domain.
+        h_scale = image_shape[0] / (window[2] - window[0])
+        w_scale = image_shape[1] / (window[3] - window[1])
+        scale = min(h_scale, w_scale)
+        shift = window[:2]  # y, x
+        scales = np.array([scale, scale, scale, scale])
+        shifts = np.array([shift[0], shift[1], shift[0], shift[1]])
+
+        # Translate bounding boxes to image domain
+        boxes = np.multiply(boxes - shifts, scales).astype(np.int32)
+
+        # Filter out detections with zero area. Often only happens in early
+        # stages of training when the network weights are still a bit random.
+        exclude_ix = np.where(
+            (boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1]) <= 0)[0]
+        if exclude_ix.shape[0] > 0:
+            boxes = np.delete(boxes, exclude_ix, axis=0)
+            class_ids = np.delete(class_ids, exclude_ix, axis=0)
+            scores = np.delete(scores, exclude_ix, axis=0)
+            N = class_ids.shape[0]
+
+        # Resize masks to original image size and set boundary threshold.
+        return boxes, class_ids, scores
+
+    def detect(self, image, verbose=0):
+        if verbose:
+            print("processing image....")
+
+        molded_image, image_meta, window = self.mold_inputs(image)
+
+        detection, rcnn_class_probs, rcnn_bbox,\
+            ROIS_proposals, rpn_probs, rpn_bbox_offset = \
+                self.rcnn_model.predict([molded_image,image_meta], verbose=0)
+
+        results = []
+
+        final_roi, final_class_ids, final_scores =\
+            self.unmold_detections(detection, image.shape, window)
+
+        results.append({
+            "rois": final_rois,
+            "class_ids": final_class_ids,
+            "scores": final_scores,
+        })
+
+        return results

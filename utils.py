@@ -292,5 +292,21 @@ def resize_mask(mask, scale, padding):
     mask = np.pad(mask, padding, mode='constant', constant_values=0)
     return mask
 
+def mold_image(images, config):
+    """Expects an RGB image (or array of images) and subtracts
+    the mean pixel and converts it to float. Expects image
+    colors in RGB order.
+    """
+    return images.astype(np.float32) - config.MEAN_PIXEL
+
+def compose_image_meta(image_id, image_shape, window, active_class_ids):
+    meta = np.array(
+        [image_id] +                  # size=1
+        list(image_shape) +           # size=3
+        list(window) +                # size=4 (y1, x1, y2, x2) in image cooredinates                    # size=1
+        list(active_class_ids)        # size=num_classes
+    )
+    return meta
+
 #a=tf.constant([[0,0,0,0],[0,1,2,0],[0,3,4,0],[0,0,0,0]])
 #print(tf.math.argmax(a))
