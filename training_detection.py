@@ -114,8 +114,10 @@ class TrainingDetectionLayer(layers.Layer):
         #output = utils.batch_slice([rois,gt_ids,gt_boxes,gt_masks], lambda x,y,z,w : detection_graph(x,y,z,w,self.config),
         #                           self.config.IMAGES_PER_GPU, names=names)
 
-        output = utils.batch_slice([rois,gt_ids,gt_boxes], lambda x,y,z : detection_graph(x,y,z,self.config),
-                                   self.config.IMAGES_PER_GPU, names=names)
+        output = utils.batch_slice(
+                    [rois,gt_ids,gt_boxes],
+                    lambda x,y,z : detection_graph(x,y,z,self.config),
+                    self.config.IMAGES_PER_GPU, names=names)
 
         return output
 
@@ -123,7 +125,7 @@ class TrainingDetectionLayer(layers.Layer):
         return [
             (None, self.config.TRAIN_ROIS_PER_IMAGE, 4),  # rois
             (None, 1),  # class_ids
-            (None, self.config.TRAIN_ROIS_PER_IMAGE, 4),  # deltas
+            (None, self.config.TRAIN_ROIS_PER_IMAGE, 4)  # deltas
             #(None, self.config.TRAIN_ROIS_PER_IMAGE, self.config.MASK_SHAPE[0], self.config.MASK_SHAPE[1])
         ]
 

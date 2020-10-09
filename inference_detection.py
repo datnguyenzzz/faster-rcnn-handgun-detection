@@ -4,16 +4,15 @@ from tensorflow.keras import backend as K
 
 import utils
 
-def refine_detections_graph(rois, probs, deltas, window, config):
+def refine_detections(rois, probs, deltas, window, config):
     # Class IDs per ROI
     class_ids = tf.argmax(probs, axis=1, output_type=tf.int32)
     # Class probability of the top class of each ROI
-    indices = tf.stack([tf.range(probs.shape[0]), class_ids], axis=1)
+    indices = tf.stack([tf.range(tf.shape(probs)[0]), class_ids], axis=1)
     class_scores = tf.gather_nd(probs, indices)
     # Class-specific bounding box deltas
     deltas_specific = tf.gather_nd(deltas, indices)
     # Apply bounding box deltas
-    # Shape: [boxes, (y1, x1, y2, x2)] in normalized coordinates
     refined_rois = utils.apply_bbox_offset(
         rois, deltas_specific * config.BBOX_STD_DEV)
     # Convert coordiates to image domain
@@ -23,7 +22,7 @@ def refine_detections_graph(rois, probs, deltas, window, config):
     # Clip boxes to image window
     refined_rois = utils.clip_boxes(refined_rois, window)
     # Round and cast to int since we're deadling with pixels now
-    refined_rois = tf.to_int32(tf.rint(refined_rois))
+    refined_rois = tf.cast(tf.math.rint(refined_rois), tf.int32)
 
     # TODO: Filter out boxes with zero area
 
@@ -32,9 +31,11 @@ def refine_detections_graph(rois, probs, deltas, window, config):
     # Filter out low confidence boxes
     if config.DETECTION_MIN_CONFIDENCE:
         conf_keep = tf.where(class_scores >= config.DETECTION_MIN_CONFIDENCE)[:, 0]
-        keep = tf.sets.set_intersection(tf.expand_dims(keep, 0),
-                                        tf.expand_dims(conf_keep, 0))
-        keep = tf.sparse_tensor_to_dense(keep)[0]
+        #keep = tf.sets.set_intersection(tf.expand_dims(keep, 0),
+        #                                tf.expand_dims(conf_keep, 0))
+        keep = tf.sets.intersection(tf.expand_dims(keep, 0),tf.expand_dims(conf_keep, 0))
+        #keep = tf.sparse_tensor_to_dense(keep)[0]
+        keep = tf.sparse.to_dense(keep)[0]
 
     # Apply per-class NMS
     # 1. Prepare variables
@@ -49,7 +50,8 @@ def refine_detections_graph(rois, probs, deltas, window, config):
         ixs = tf.where(tf.equal(pre_nms_class_ids, class_id))[:, 0]
         # Apply NMS
         class_keep = tf.image.non_max_suppression(
-                tf.to_float(tf.gather(pre_nms_rois, ixs)),
+                #tf.to_float(tf.gather(pre_nms_rois, ixs)),
+                tf.cast(tf.gather(pre_nms_rois, ixs), tf.float32),
                 tf.gather(pre_nms_scores, ixs),
                 max_output_size=config.DETECTION_MAX_INSTANCES,
                 iou_threshold=config.DETECTION_NMS_THRESHOLD)
@@ -57,22 +59,22 @@ def refine_detections_graph(rois, probs, deltas, window, config):
         class_keep = tf.gather(keep, tf.gather(ixs, class_keep))
         # Pad with -1 so returned tensors have the same shape
         gap = config.DETECTION_MAX_INSTANCES - tf.shape(class_keep)[0]
-        class_keep = tf.pad(class_keep, [(0, gap)],
-                            mode='CONSTANT', constant_values=-1)
+        class_keep = tf.pad(class_keep, [(0, gap)],mode='CONSTANT', constant_values=-1)
         # Set shape so map_fn() can infer result shape
         class_keep.set_shape([config.DETECTION_MAX_INSTANCES])
         return class_keep
 
     # 2. Map over class IDs
-    nms_keep = tf.map_fn(nms_keep_map, unique_pre_nms_class_ids,
-                         dtype=tf.int64)
+    nms_keep = tf.map_fn(nms_keep_map, unique_pre_nms_class_ids,dtype=tf.int64)
     # 3. Merge results into one list, and remove -1 padding
     nms_keep = tf.reshape(nms_keep, [-1])
     nms_keep = tf.gather(nms_keep, tf.where(nms_keep > -1)[:, 0])
     # 4. Compute intersection between keep and nms_keep
-    keep = tf.sets.set_intersection(tf.expand_dims(keep, 0),
-                                    tf.expand_dims(nms_keep, 0))
-    keep = tf.sparse_tensor_to_dense(keep)[0]
+    #keep = tf.sets.set_intersection(tf.expand_dims(keep, 0),
+    #                                tf.expand_dims(nms_keep, 0))
+    #keep = tf.sparse_tensor_to_dense(keep)[0]
+    keep = tf.sets.intersection(tf.expand_dims(keep, 0),tf.expand_dims(nms_keep, 0))
+    keep = tf.sparse.to_dense(keep)[0]
     # Keep top detections
     roi_count = config.DETECTION_MAX_INSTANCES
     class_scores_keep = tf.gather(class_scores, keep)
@@ -83,8 +85,10 @@ def refine_detections_graph(rois, probs, deltas, window, config):
     # Arrange output as [N, (y1, x1, y2, x2, class_id, score)]
     # Coordinates are in image domain.
     detections = tf.concat([
-        tf.to_float(tf.gather(refined_rois, keep)),
-        tf.to_float(tf.gather(class_ids, keep))[..., tf.newaxis],
+        #tf.to_float(tf.gather(refined_rois, keep)),
+        tf.cast(tf.gather(refined_rois, keep), tf.float32),
+        #tf.to_float(tf.gather(class_ids, keep))[..., tf.newaxis],
+        tf.cast(tf.gather(class_ids, keep), tf.float32)[..., tf.newaxis],
         tf.gather(class_scores, keep)[..., tf.newaxis]
         ], axis=1)
 

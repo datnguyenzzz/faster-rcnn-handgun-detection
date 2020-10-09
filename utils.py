@@ -4,6 +4,161 @@ from tensorflow.keras import backend as K
 from tensorflow.keras import layers
 from skimage.transform import resize
 import scipy
+import skimage.io
+import skimage.color
+
+
+class Dataset(object):
+    """The base class for dataset classes.
+    To use it, create a new class that adds functions specific to the dataset
+    you want to use. For example:
+
+    class CatsAndDogsDataset(Dataset):
+        def load_cats_and_dogs(self):
+            ...
+        def load_mask(self, image_id):
+            ...
+        def image_reference(self, image_id):
+            ...
+
+    See COCODataset and ShapesDataset as examples.
+    """
+
+    def __init__(self, class_map=None):
+        self._image_ids = []
+        self.image_info = []
+        # Background is always the first class
+        self.class_info = [{"source": "", "id": 0, "name": "BG"}]
+        self.source_class_ids = {}
+
+    def add_class(self, source, class_id, class_name):
+        assert "." not in source, "Source name cannot contain a dot"
+        # Does the class exist already?
+        for info in self.class_info:
+            if info['source'] == source and info["id"] == class_id:
+                # source.class_id combination already available, skip
+                return
+        # Add the class
+        self.class_info.append({
+            "source": source,
+            "id": class_id,
+            "name": class_name,
+        })
+
+    def add_image(self, source, image_id, path, **kwargs):
+        image_info = {
+            "source": source,
+            "id": image_id,
+            "path": path,
+        }
+        image_info.update(kwargs)
+        self.image_info.append(image_info)
+
+    def image_reference(self, image_id):
+        """Return a link to the image in its source Website or details about
+        the image that help looking it up or debugging it.
+
+        Override for your dataset, but pass to this function
+        if you encounter images not in your dataset.
+        """
+        return ""
+
+    def prepare(self, class_map=None):
+        """Prepares the Dataset class for use.
+
+        TODO: class map is not supported yet. When done, it should handle mapping
+              classes from different datasets to the same class ID.
+        """
+
+        def clean_name(name):
+            """Returns a shorter version of object names for cleaner display."""
+            return ",".join(name.split(",")[:1])
+
+        # Build (or rebuild) everything else from the info dicts.
+        self.num_classes = len(self.class_info)
+        self.class_ids = np.arange(self.num_classes)
+        self.class_names = [clean_name(c["name"]) for c in self.class_info]
+        self.num_images = len(self.image_info)
+        self._image_ids = np.arange(self.num_images)
+
+        self.class_from_source_map = {"{}.{}".format(info['source'], info['id']): id
+                                      for info, id in zip(self.class_info, self.class_ids)}
+
+        # Map sources to class_ids they support
+        self.sources = list(set([i['source'] for i in self.class_info]))
+        self.source_class_ids = {}
+        # Loop over datasets
+        for source in self.sources:
+            self.source_class_ids[source] = []
+            # Find classes that belong to this dataset
+            for i, info in enumerate(self.class_info):
+                # Include BG class in all datasets
+                if i == 0 or source == info['source']:
+                    self.source_class_ids[source].append(i)
+
+    def map_source_class_id(self, source_class_id):
+        """Takes a source class ID and returns the int class ID assigned to it.
+
+        For example:
+        dataset.map_source_class_id("coco.12") -> 23
+        """
+        return self.class_from_source_map[source_class_id]
+
+    def get_source_class_id(self, class_id, source):
+        """Map an internal class ID to the corresponding class ID in the source dataset."""
+        info = self.class_info[class_id]
+        assert info['source'] == source
+        return info['id']
+
+    def append_data(self, class_info, image_info):
+        self.external_to_class_id = {}
+        for i, c in enumerate(self.class_info):
+            for ds, id in c["map"]:
+                self.external_to_class_id[ds + str(id)] = i
+
+        # Map external image IDs to internal ones.
+        self.external_to_image_id = {}
+        for i, info in enumerate(self.image_info):
+            self.external_to_image_id[info["ds"] + str(info["id"])] = i
+
+    @property
+    def image_ids(self):
+        return self._image_ids
+
+    def source_image_link(self, image_id):
+        """Returns the path or URL to the image.
+        Override this to return a URL to the image if it's availble online for easy
+        debugging.
+        """
+        return self.image_info[image_id]["path"]
+
+    def load_image(self, image_id):
+        """Load the specified image and return a [H,W,3] Numpy array.
+        """
+        # Load image
+        image = skimage.io.imread(self.image_info[image_id]['path'])
+        # If grayscale. Convert to RGB for consistency.
+        if image.ndim != 3:
+            image = skimage.color.gray2rgb(image)
+        if image.shape[2] == 4:
+            image = np.delete(image, -1, 2)
+        #print(image)
+        return image
+
+    def load_bboxes(self, image_id):
+
+        bboxes = self.image_info[image_id]['bboxes']
+
+        gt_boxes = np.zeros([len(bboxes), 4], dtype=np.float32)
+
+        for i,bbox in enumerate(bboxes):
+            x,y,w,h = bbox
+            y1,x1,y2,x2 = y,x,y+h,x+w
+
+            gt_boxes[i] = np.array([y1,x1,y2,x2])
+
+        return gt_boxes
+
 
 class BatchNorm(layers.BatchNormalization):
     """
@@ -37,64 +192,68 @@ def generate_anchors(scales,ratios,anchor_stride,feature_shapes,feature_strides)
         center_x = np.arange(0,feature_shape[1],anchor_stride) * feature_stride
         center_x,center_y = np.meshgrid(center_x,center_y)
 
-        w,center_x = np.meshgrid(w,center_x)
-        h,center_y = np.meshgrid(h,center_y)
+        box_widths, box_centers_x = np.meshgrid(w,center_x)
+        box_heights, box_centers_y = np.meshgrid(h,center_y)
 
-        boxes_center = np.stack([center_y,center_x],axis=2).reshape([-1,2])
-        boxes_shape = np.stack([h,w],axis=2).reshape([-1,2])
+        box_centers = np.stack(
+            [box_centers_y, box_centers_x], axis=2).reshape([-1, 2])
+        box_sizes = np.stack([box_heights, box_widths], axis=2).reshape([-1, 2])
 
-        boxes = np.concatenate([boxes_center - 0.5 * boxes_shape,
-                                boxes_center + 0.5 * boxes_shape], axis=1)
+        boxes = np.concatenate([box_centers - 0.5 * box_sizes,
+                                box_centers + 0.5 * box_sizes], axis=1)
 
         anchors.append(boxes)
 
     return np.concatenate(anchors, axis=0)
 
-def batch_slice(input, func, batch_size, names=None):
-    if not isinstance(input,list):
-        input = [input]
+def batch_slice(inputs, graph_fn, batch_size, names=None):
+    if not isinstance(inputs, list):
+        inputs = [inputs]
 
-    output = []
+    outputs = []
     for i in range(batch_size):
-        input_slice = [x[i] for x in input]
-        output_slice = func(*input_slice)
-        if not isinstance(output_slice, (tuple,list)):
+        inputs_slice = [x[i] for x in inputs]
+        output_slice = graph_fn(*inputs_slice)
+        if not isinstance(output_slice, (tuple, list)):
             output_slice = [output_slice]
-        output.append(output_slice)
-
-    output = list(zip(*output))
+        outputs.append(output_slice)
+    # Change outputs from a list of slices where each is
+    # a list of outputs to a list of outputs and each has
+    # a list of slices
+    outputs = list(zip(*outputs))
 
     if names is None:
-        names = [None] * len(output)
+        names = [None] * len(outputs)
 
-    res = [tf.stack(o, axis=0, name=n) for o,n in zip(output,names)]
-    if len(res)==1:
-        res = res[0]
-    return res
+    result = [tf.stack(o, axis=0, name=n)
+              for o, n in zip(outputs, names)]
+    if len(result) == 1:
+        result = result[0]
 
-def apply_bbox_offset(anchors, bbox_offset):
-    """
-    anchor = [y1,x1,y2,x2]
-    bbox_offset = [dy,dx,log(dh),log(dw)]
-    """
-    h = anchors[:,2] - anchors[:,0]
-    w = anchors[:,3] - anchors[:,1]
-    center_y = anchors[:,0] + 0.5 * h
-    center_x = anchors[:,1] + 0.5 * w
+    return result
 
-    center_y += bbox_offset[:,0] * h
-    center_x += bbox_offset[:,1] * w
-    h *= tf.exp(bbox_offset[:,2])
-    w *= tf.exp(bbox_offset[:,3])
 
-    y1 = center_y - 0.5 * h
-    x1 = center_x - 0.5 * w
-    y2 = y1 + h
-    x2 = x1 + w
-    res = tf.stack([y1,x1,y2,x2],axis=1)
-    return res
+def apply_bbox_offset(boxes, deltas):
+    # Convert to y, x, h, w
+    height = boxes[:, 2] - boxes[:, 0]
+    width = boxes[:, 3] - boxes[:, 1]
+    center_y = boxes[:, 0] + 0.5 * height
+    center_x = boxes[:, 1] + 0.5 * width
+    # Apply deltas
+    center_y += deltas[:, 0] * height
+    center_x += deltas[:, 1] * width
+    height *= tf.math.exp(deltas[:, 2])
+    width *= tf.math.exp(deltas[:, 3])
+    # Convert back to y1, x1, y2, x2
+    y1 = center_y - 0.5 * height
+    x1 = center_x - 0.5 * width
+    y2 = y1 + height
+    x2 = x1 + width
+    result = tf.stack([y1, x1, y2, x2], axis=1, name="apply_box_deltas_out")
+    return result
 
 def clip_boxes(boxes, window):
+
     wy1,wx1,wy2,wx2 = tf.split(window,4)
     y1,x1,y2,x2 = tf.split(boxes,4,axis=1)
 
@@ -103,41 +262,40 @@ def clip_boxes(boxes, window):
     y2 = tf.maximum(tf.minimum(y2,wy2),wy1)
     x2 = tf.maximum(tf.minimum(x2,wx2),wx1)
 
-    clipped = tf.concat([y1,x1,y2,x2],axis=1)
+    clipped = tf.concat([y1,x1,y2,x2],axis=1,name="clipped_boxes")
     clipped.set_shape((clipped.shape[0],4))
     return clipped
 
-def remove_zero_padding(boxes):
-    is_zeros = tf.cast(tf.math.reduce_sum(tf.math.abs(boxes), axis=1), tf.bool)
-    boxes = tf.boolean_mask(boxes, is_zeros)
-    return boxes, is_zeros
+def remove_zero_padding(boxes, name=None):
+    non_zeros = tf.cast(tf.reduce_sum(tf.abs(boxes), axis=1), tf.bool)
+    boxes = tf.boolean_mask(boxes, non_zeros)
+    return boxes, non_zeros
 
 def IoU_overlap(boxes1, boxes2): #for tf
     #tile boxes2 and loop boxes1
-    box1 = tf.reshape(tf.tile(tf.expand_dims(boxes1,1), [1,1,tf.shape(boxes2)[0]]), [-1,4])
-    box2 = tf.tile(boxes2, [tf.shape(boxes1)[0],1])
-
-    y11,x11,y21,x21 = tf.split(box1,4,axis=1)
-    y12,x12,y22,x22 = tf.split(box2,4,axis=1)
-
-    y1 = tf.maximum(y11,y12)
-    x1 = tf.maximum(x11,x12)
-    y2 = tf.minimum(y21,y22)
-    x2 = tf.minimum(x21,x22)
-
-    I = tf.maximum(x2-x1,0) * tf.maximum(y2-y1,0)
-    U = (y21-y11)*(x21-x11) + (y22-y12)*(x22-x12) - I
-
-    #print(tf.where(U==0.0))
-
-    IoU = I/U
-
-    IoU = tf.reshape(IoU, [tf.shape(boxes1)[0], tf.shape(boxes2)[0]])
-    return IoU
+    b1 = tf.reshape(tf.tile(tf.expand_dims(boxes1, 1),
+                            [1, 1, tf.shape(boxes2)[0]]), [-1, 4])
+    b2 = tf.tile(boxes2, [tf.shape(boxes1)[0], 1])
+    # 2. Compute intersections
+    b1_y1, b1_x1, b1_y2, b1_x2 = tf.split(b1, 4, axis=1)
+    b2_y1, b2_x1, b2_y2, b2_x2 = tf.split(b2, 4, axis=1)
+    y1 = tf.maximum(b1_y1, b2_y1)
+    x1 = tf.maximum(b1_x1, b2_x1)
+    y2 = tf.minimum(b1_y2, b2_y2)
+    x2 = tf.minimum(b1_x2, b2_x2)
+    intersection = tf.maximum(x2 - x1, 0) * tf.maximum(y2 - y1, 0)
+    # 3. Compute unions
+    b1_area = (b1_y2 - b1_y1) * (b1_x2 - b1_x1)
+    b2_area = (b2_y2 - b2_y1) * (b2_x2 - b2_x1)
+    union = b1_area + b2_area - intersection
+    # 4. Compute IoU and reshape to [boxes1, boxes2]
+    iou = intersection / union
+    overlaps = tf.reshape(iou, [tf.shape(boxes1)[0], tf.shape(boxes2)[0]])
+    return overlaps
 
 def compute_overlaps(boxes1, boxes2):
 
-    #print("fucknp ",boxes1,boxes2)
+    #print("fucknp ",boxes2)
 
     def compute_iou(box, boxes, box_area, boxes_area):
         # Calculate intersection areas
@@ -195,8 +353,8 @@ def compute_bbox_offset(rois,gt_boxes):
 def parse_image_meta(meta):
     image_id = meta[:,0]
     image_shape = meta[:,1:4]
-    window = meta[:,4:7]
-    class_ids = meta[:,7:]
+    window = meta[:,4:8]
+    class_ids = meta[:,8:]
     return {
         "image_id": image_id,
         "image_shape": image_shape,
@@ -216,43 +374,6 @@ def batch_pack(x, counts, num_rows):
         outputs.append(x[i, :counts[i]])
     return tf.concat(outputs, axis=0)
 
-def extract_bboxes(mask):
-    """Compute bounding boxes from masks.
-    mask: [height, width, num_instances]. Mask pixels are either 1 or 0.
-
-    Returns: bbox array [num_instances, (y1, x1, y2, x2)].
-    """
-    boxes = np.zeros([mask.shape[-1], 4], dtype=np.int32)
-    for i in range(mask.shape[-1]):
-        m = mask[:, :, i]
-        # Bounding box.
-        horizontal_indicies = np.where(np.any(m, axis=0))[0]
-        vertical_indicies = np.where(np.any(m, axis=1))[0]
-        if horizontal_indicies.shape[0]:
-            x1, x2 = horizontal_indicies[[0, -1]]
-            y1, y2 = vertical_indicies[[0, -1]]
-            # x2 and y2 should not be part of the box. Increment by 1.
-            x2 += 1
-            y2 += 1
-        else:
-            # No mask for this instance. Might happen due to
-            # resizing or cropping. Set bbox to zeros
-            x1, x2, y1, y2 = 0, 0, 0, 0
-        boxes[i] = np.array([y1, x1, y2, x2])
-    return boxes.astype(np.int32)
-
-
-def minimize_mask(bbox, mask, mini_shape):
-    mini_mask = np.zeros(mini_shape + (mask.shape[-1],), dtype=bool)
-    for i in range(mask.shape[-1]):
-        m = mask[:, :, i]
-        y1, x1, y2, x2 = bbox[i][:4]
-        m = m[y1:y2, x1:x2]
-        if m.size == 0:
-            raise Exception("Invalid bounding box with area of zero")
-        m = resize(m.astype(float), mini_shape)
-        mini_mask[:, :, i] = np.where(m >= 128, 1, 0)
-    return mini_mask
 
 def resize_image(image, min_dim=None, max_dim=None, padding=False):
     # Default window (y1, x1, y2, x2) and default scale == 1.
@@ -285,12 +406,6 @@ def resize_image(image, min_dim=None, max_dim=None, padding=False):
         window = (top_pad, left_pad, h + top_pad, w + left_pad)
     return image, window, scale, padding
 
-
-def resize_mask(mask, scale, padding):
-    h, w = mask.shape[:2]
-    mask = scipy.ndimage.zoom(mask, zoom=[scale, scale, 1], order=0)
-    mask = np.pad(mask, padding, mode='constant', constant_values=0)
-    return mask
 
 def mold_image(images, config):
     """Expects an RGB image (or array of images) and subtracts
