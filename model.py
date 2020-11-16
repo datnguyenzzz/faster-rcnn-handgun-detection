@@ -21,6 +21,8 @@ import losses
 import data_generator
 ########debugs##########
 import display_data
+from skimage.transform import resize
+import cv2
 
 import h5py
 from tensorflow.python.keras.engine.saving import hdf5_format
@@ -289,10 +291,10 @@ class RCNN():
         #print(model.layers)
         return model
 
-    def load_weights(self, path, by_name):
+    def load_weights(self, path, by_name, isCoco):
 
         #if path == "/content/drive/My Drive/database/model/mask_rcnn_balloon.h5":
-        if path == "D:\My_Code\database\model\mask_rcnn_balloon.h5":
+        if isCoco == 1:
             exclude = ["mrcnn_class_logits", "mrcnn_bbox_fc",
                        "mrcnn_bbox", "mrcnn_mask"]
         else:
@@ -403,8 +405,10 @@ class RCNN():
             if layer.output in self.rcnn_model.losses:
                 continue
 
-            self.rcnn_model.add_loss(
-                tf.math.reduce_mean(layer.output, keepdims=True))
+            loss = (
+                tf.math.reduce_mean(layer.output, keepdims=True)
+                * self.config.LOSS_WEIGHTS.get(name, 1.))
+            self.rcnn_model.add_loss(loss)
 
         #l2 Regularization
         reg_losses = [
@@ -424,7 +428,10 @@ class RCNN():
             layer = self.rcnn_model.get_layer(name)
             self.rcnn_model.metrics_names.append(name)
 
-            loss = tf.math.reduce_mean(layer.output, keepdims = True)
+            loss = (
+                tf.math.reduce_mean(layer.output, keepdims=True)
+                * self.config.LOSS_WEIGHTS.get(name, 1.))
+
             self.rcnn_model.add_metric(loss,name=name, aggregation='mean')
 
 
@@ -484,15 +491,18 @@ class RCNN():
         for image in images:
             # Resize image to fit the model expected size
             # TODO: move resizing to mold_image()
-            molded_image, window, scale, padding = utils.resize_image(
-                image,
-                min_dim=self.config.IMAGE_MIN_DIM,
-                max_dim=self.config.IMAGE_MAX_DIM,
-                padding=True)
+
+            molded_image = resize(image, (self.config.IMAGE_MAX_DIM, self.config.IMAGE_MAX_DIM))
+
+            shape = molded_image.shape
+            molded_image = molded_image * np.full((shape),255.0)
+
             molded_image = utils.mold_image(molded_image, self.config)
+
+            window = (0,0,self.config.IMAGE_MAX_DIM,self.config.IMAGE_MAX_DIM)
             # Build image_meta
             image_meta = utils.compose_image_meta(
-                0, image.shape, window,
+                0, molded_image.shape, window,
                 np.zeros([self.config.NUM_CLASSES], dtype=np.int32))
             # Append
             molded_images.append(molded_image)
@@ -517,6 +527,7 @@ class RCNN():
         class_ids = detections[:N, 4].astype(np.int32)
         scores = detections[:N, 5]
 
+        """
         # Compute scale and shift to translate coordinates to image domain.
         h_scale = image_shape[0] / (window[2] - window[0])
         w_scale = image_shape[1] / (window[3] - window[1])
@@ -539,6 +550,7 @@ class RCNN():
             N = class_ids.shape[0]
 
         # Resize masks to original image size and set boundary threshold.
+        """
         return boxes, class_ids, scores
 
     def detect(self, image, verbose=0):
@@ -574,8 +586,8 @@ class RCNN():
         display_data.inspect(image[0],rois)
         """
 
-        for x in rcnn_class_probs[0]:
-            print(x)
+        #for x in rcnn_class_probs[0]:
+        #    print(x)
 
         #print(rcnn_bbox)
         results = []
@@ -590,4 +602,34 @@ class RCNN():
                 "scores": final_scores,
             })
 
-        return results
+        print(results[0]['class_ids'])
+        print(results[0]['scores'])
+
+        ROI = []
+
+        for i,img in enumerate(image):
+            """
+            img = resize(img,(self.config.IMAGE_MAX_DIM,self.config.IMAGE_MAX_DIM))
+            shape = img.shape
+            img = img * np.full((shape),255.0)
+            """
+
+            shape = img.shape
+
+            for roi in results[i]['rois']:
+                y1,x1,y2,x2 = roi
+
+                x1 = x1 * 1.0 * shape[1] / self.config.IMAGE_MAX_DIM
+                x2 = x2 * 1.0 * shape[1] / self.config.IMAGE_MAX_DIM
+                y1 = y1 * 1.0 * shape[0] / self.config.IMAGE_MAX_DIM
+                y2 = y2 * 1.0 * shape[0] / self.config.IMAGE_MAX_DIM
+
+
+                x1 = int(x1)
+                x2 = int(x2)
+                y1 = int(y1)
+                y2 = int(y2)
+
+                ROI.append([y1,x1,y2,x2])
+
+        return ROI, results[0]['scores']

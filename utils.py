@@ -414,6 +414,13 @@ def mold_image(images, config):
     """
     return images.astype(np.float32) - config.MEAN_PIXEL
 
+def unmold_image(images, config):
+    """Expects an RGB image (or array of images) and subtracts
+    the mean pixel and converts it to float. Expects image
+    colors in RGB order.
+    """
+    return images.astype(np.float32) + config.MEAN_PIXEL
+
 def compose_image_meta(image_id, image_shape, window, active_class_ids):
     meta = np.array(
         [image_id] +                  # size=1

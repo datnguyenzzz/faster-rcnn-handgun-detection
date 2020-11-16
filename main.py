@@ -9,6 +9,8 @@ import math
 import utils
 
 import display_data
+from skimage.transform import resize
+import cv2
 
 from model import RCNN
 
@@ -33,7 +35,7 @@ class Config():
         self.IMAGES_PER_GPU = 1
         self.NUM_CLASSES = 1 + 1
         self.BATCH_SIZE = self.IMAGES_PER_GPU
-        self.DETECTION_MIN_CONFIDENCE = 0.7 #
+        self.DETECTION_MIN_CONFIDENCE = 0.65 #
         #self.IMAGE_MIN_DIM = 416
         #self.IMAGE_MAX_DIM = 416
         self.IMAGE_MIN_DIM = 512
@@ -61,11 +63,11 @@ class Config():
              for stride in self.BACKBONE_STRIDES])
 
         #for anchors
-        self.ANCHOR_SCALES = (32,64,128,256,512)
-        #self.ANCHOR_SCALES = (16,32,64,128,256)
+        #self.ANCHOR_SCALES = (32,64,128,256,512)
+        self.ANCHOR_SCALES = (16,32,64,128,256)
         self.ANCHOR_RATIOS = [0.5,1,2]
         self.ANCHOR_STRIDE = 1
-        self.RPN_TRAIN_ANCHORS_PER_IMAGE = 256 #
+        self.RPN_TRAIN_ANCHORS_PER_IMAGE = 200 #
 
         #for ROI
         self.NUM_ROI_TRAINING = 2000
@@ -73,12 +75,19 @@ class Config():
         self.NMS_THRESHOLD = 0.7 #Non-Max suppression for choosing ROI
         self.BBOX_STD_DEV =  np.array([0.1, 0.1, 0.2, 0.2]) #standard deviation
         self.PRE_NMS_LIMIT = 6000
-        self.TRAIN_ROIS_PER_IMAGE = 300 #
+        self.TRAIN_ROIS_PER_IMAGE = 200 #
         self.POSITIVE_ROI_RATIO = 0.33
 
         self.DETECTION_MAX_INSTANCES = 400 #
         self.DETECTION_NMS_THRESHOLD = 0.3
         self.MAX_GT_INSTANCES = 100
+
+        self.LOSS_WEIGHTS = {
+            "rpn_class_loss": 1., #1.
+            "rpn_bbox_loss": 2.,#2.,
+            "mrcnn_class_loss": 2.,#4.,
+            "mrcnn_bbox_loss": 5.,#2.
+        }
 
         #ROI Pooling
         self.POOL_SIZE = 7
@@ -87,17 +96,17 @@ class Config():
         self.FPN_CLS_FC_LAYERS = 1024
 
         #image RGB mean
-        #self.MEAN_PIXEL = np.array([123.7, 116.8, 103.9])
+        self.MEAN_PIXEL = np.array([123.7, 116.8, 103.9])
         #self.MEAN_PIXEL = np.array([108.07914190458807, 99.7199589494769, 93.13341886188812])
-        self.MEAN_PIXEL = np.array([147.4,141.5,137.1])
+        #self.MEAN_PIXEL = np.array([147.4,141.5,137.1])
 
         #learning
-        self.LEARNING_RATE = 0.001
+        self.LEARNING_RATE = 0.0001
         self.LEARNING_MOMENTUM = 0.9
         self.GRADIENT_CLIP_NORM = 5.0
-        self.WEIGHT_DECAY = 0.0005
+        self.WEIGHT_DECAY = 0.0001
         self.STEPS_PER_EPOCH = 1000 #
-        self.VALIDATION_STEPS = 70 #
+        self.VALIDATION_STEPS = 50 #
 
 class Dataset(utils.Dataset):
 
@@ -153,7 +162,7 @@ class Dataset(utils.Dataset):
 
 
 
-def train(model):
+def train(model,config):
     dataset_train = Dataset()
     dataset_train.load_attributes("train")
     dataset_train.prepare()
@@ -163,10 +172,7 @@ def train(model):
     dataset_val.prepare()
 
 
-    #LEARNING_RATE = 0.001
-    LEARNING_RATE = 0.0001
-
-    model.train(dataset_train, dataset_val, learning_rate=LEARNING_RATE, epochs = 20)
+    model.train(dataset_train, dataset_val, learning_rate=config.LEARNING_RATE, epochs = 20)
 
     #display_data.view(dataset_train, model.config, shuffle=True, batch_size=model.config.BATCH_SIZE)
 
@@ -186,11 +192,80 @@ def detect_image(model, image_path=None):
     print("Image detection start ", image_path)
     image = skimage.io.imread(image_path)
 
-    r = model.detect([image], verbose=1)[0]
 
-    print("ROIS: ",r['rois'])
-    print("class ids",r['class_ids'])
-    print("Scores",r['scores'])
+    r, s = model.detect([image], verbose=1)
+
+    print(r)
+
+    for i,roi in enumerate(r):
+        y1,x1,y2,x2 = roi
+
+        imgHeight, imgWidth, _ = model.config.IMAGE_SHAPE
+        thick = int((imgHeight + imgWidth) // 500)
+        color = (255,84,0)
+
+        score = s[i]
+
+        label = 'gun - score: ' + str(int(score * 100)/100)
+
+        #image = utils.unmold_image(image, model.confi
+
+        cv2.rectangle(image,(x1, y1), (x2, y2), color, thick)
+        cv2.putText(image, label, (x1, y1 - 12), 0, 2*1e-3 * imgHeight, color, thick//2)
+    link = 'output3.png'
+    RGB_img = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    cv2.imwrite(link, RGB_img)
+
+
+def detect_video(model, video_path=None):
+    import cv2
+
+    vcapture = cv2.VideoCapture(video_path)
+
+    h,w = int(vcapture.get(cv2.CAP_PROP_FRAME_HEIGHT)), int(vcapture.get(cv2.CAP_PROP_FRAME_WIDTH))
+
+    print(h,w)
+
+    file_name = "detected_output.avi"
+    fps = vcapture.get(cv2.CAP_PROP_FPS)
+    vwrite = cv2.VideoWriter(file_name, cv2.VideoWriter_fourcc(*'MJPG'), fps, (w,h))
+
+    count = 0
+    success = True
+
+    while success:
+        print("frame: ", count)
+        success, image = vcapture.read()
+
+        if success:
+            image = image[..., ::-1]
+
+            image = np.array(image)
+            r, s = model.detect([image], verbose=1)
+
+            for i,roi in enumerate(r):
+                y1,x1,y2,x2 = roi
+
+                imgHeight, imgWidth, _ = model.config.IMAGE_SHAPE
+                thick = int((imgHeight + imgWidth) // 500)
+                color = (0,255,17)
+
+                score = s[i]
+
+
+                label = 'gun - score: ' + str(int(score * 100)/100)
+
+                cv2.rectangle(image,(x1, y1), (x2, y2), color, thick)
+                cv2.putText(image, label, (x1, y1 - 12), 0, 2*1e-3 * imgHeight, color, thick//2)
+
+
+            image = image[..., ::-1]
+            vwrite.write(image)
+
+            count += 1
+
+    vwrite.release()
+
 
 ################################################################################
 #command: main python main.py train/inference --weights=coco/last --image=link
@@ -211,8 +286,12 @@ if args.command == "train":
 else:
     model = RCNN(mode = "inference", config = config)
 #load resnet101 pretrained model
+
+isCoco = 0
+
 if args.weights == "coco":
     weight_path = COCO_WEIGHTS
+    isCoco = 1
     print(weight_path)
 elif args.weights == "last":
     weight_path = model.find_last()
@@ -220,15 +299,16 @@ elif args.weights == "last":
 else:
     weight_path = args.weights
 
-model.load_weights(weight_path, by_name=True)
+model.load_weights(weight_path, by_name=True, isCoco = isCoco)
 
 
 if args.command == "train":
-    train(model)
+    train(model,config)
 elif args.command == "inference":
     if args.image!=None:
-        #detect_image(model, image_path=args.image)
-        x=1
+        detect_image(model, image_path=args.image)
+    elif args.video!=None:
+        detect_video(model, video_path=args.video)
 
 else:
     display(model)

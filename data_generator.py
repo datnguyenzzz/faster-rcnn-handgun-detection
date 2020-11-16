@@ -20,7 +20,7 @@ def load_image_gt(dataset, config, image_id):
 
     image = image * np.full((shape),255.0)
 
-    window = (0,0,shape[0],shape[1])
+    window = (0,0,self.config.IMAGE_MAX_DIM,self.config.IMAGE_MAX_DIM)
 
     #print(window)
     #print(padding)
@@ -38,7 +38,7 @@ def load_image_gt(dataset, config, image_id):
         y2 = y2 * 1.0*config.IMAGE_MAX_DIM / old_shape
 
         bboxes[i] = np.array([y1,x1,y2,x2])
-
+    """
     if random.randint(0,1):
         import imgaug as ia
         import imgaug.augmenters as iaa
@@ -85,7 +85,7 @@ def load_image_gt(dataset, config, image_id):
 
         bboxes = gt_boxes_aug
 
-
+    """
     #print(mask.shape)
 
     #for image meta
