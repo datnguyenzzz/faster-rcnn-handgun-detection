@@ -1,6 +1,6 @@
 # Faster RCNN in real-time object detection
 
-Application in hand-gun identification, which reach 40FPS in real-time. 
+Application in hand-gun identification, which reach 20FPS in real-time. 
 
 # Image dataset 
 
